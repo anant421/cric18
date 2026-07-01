@@ -1,18 +1,19 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { requireAdmin } from '../auth.js';
+import { asyncHandler } from '../asyncHandler.js';
 
 const router = Router();
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const tournaments = await prisma.tournament.findMany({
     orderBy: { createdAt: 'desc' },
     include: { teams: true, _count: { select: { matches: true } } },
   });
   res.json(tournaments);
-});
+}));
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', asyncHandler(async (req, res) => {
   const t = await prisma.tournament.findUnique({
     where: { id: req.params.id },
     include: {
@@ -25,22 +26,22 @@ router.get('/:id', async (req, res) => {
   });
   if (!t) return res.status(404).json({ error: 'Tournament not found' });
   res.json(t);
-});
+}));
 
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', requireAdmin, asyncHandler(async (req, res) => {
   const { name, season } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
   const t = await prisma.tournament.create({ data: { name, season } });
   res.status(201).json(t);
-});
+}));
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   await prisma.tournament.delete({ where: { id: req.params.id } });
   res.status(204).end();
-});
+}));
 
 // --- Points table (with Net Run Rate, per ICC convention) ---
-router.get('/:id/points-table', async (req, res) => {
+router.get('/:id/points-table', asyncHandler(async (req, res) => {
   const tournamentId = req.params.id;
   const teams = await prisma.team.findMany({
     where: { tournamentId },
@@ -151,10 +152,10 @@ router.get('/:id/points-table', async (req, res) => {
     })
     .sort((x, y) => y.points - x.points || y.nrr - x.nrr);
   res.json(rows);
-});
+}));
 
 // --- Leaderboards ---
-router.get('/:id/stats/leaderboards', async (req, res) => {
+router.get('/:id/stats/leaderboards', asyncHandler(async (req, res) => {
   const tournamentId = req.params.id;
   const players = await prisma.player.findMany({ where: { tournamentId }, include: { team: true } });
   const balls = await prisma.ball.findMany({
@@ -215,6 +216,6 @@ router.get('/:id/stats/leaderboards', async (req, res) => {
     .sort((a, b) => b.wickets - a.wickets || a.runsConceded - b.runsConceded);
 
   res.json({ topBatting: battingList.slice(0, 20), topBowling: bowlingList.slice(0, 20) });
-});
+}));
 
 export default router;

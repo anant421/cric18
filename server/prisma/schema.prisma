@@ -71,22 +71,22 @@ model Match {
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   teamAId      String
-  teamA        Team       @relation("TeamA", fields: [teamAId], references: [id])
+  teamA        Team       @relation("TeamA", fields: [teamAId], references: [id], onDelete: Cascade)
   teamBId      String
-  teamB        Team       @relation("TeamB", fields: [teamBId], references: [id])
+  teamB        Team       @relation("TeamB", fields: [teamBId], references: [id], onDelete: Cascade)
   oversLimit   Int        @default(8)
   venue        String?
   scheduledAt  DateTime?
   status       String     @default("SCHEDULED")
 
   tossWinnerTeamId String?
-  tossWinnerTeam    Team?   @relation("TossWinner", fields: [tossWinnerTeamId], references: [id])
+  tossWinnerTeam    Team?   @relation("TossWinner", fields: [tossWinnerTeamId], references: [id], onDelete: Cascade)
   tossDecision      String?
 
   currentInningsNumber Int @default(0)
 
   winnerTeamId String?
-  winnerTeam   Team?   @relation("WinnerTeam", fields: [winnerTeamId], references: [id])
+  winnerTeam   Team?   @relation("WinnerTeam", fields: [winnerTeamId], references: [id], onDelete: Cascade)
   resultText   String?
 
   createdAt DateTime @default(now())
@@ -124,11 +124,11 @@ model Ball {
   isLegal    Boolean
 
   strikerId    String
-  striker      Player @relation("Striker", fields: [strikerId], references: [id])
+  striker      Player @relation("Striker", fields: [strikerId], references: [id], onDelete: Cascade)
   nonStrikerId String
-  nonStriker   Player @relation("NonStriker", fields: [nonStrikerId], references: [id])
+  nonStriker   Player @relation("NonStriker", fields: [nonStrikerId], references: [id], onDelete: Cascade)
   bowlerId     String
-  bowler       Player @relation("Bowler", fields: [bowlerId], references: [id])
+  bowler       Player @relation("Bowler", fields: [bowlerId], references: [id], onDelete: Cascade)
 
   runsBat   Int    @default(0)
   extraType String @default("NONE")
@@ -137,9 +137,9 @@ model Ball {
   isWicket    Boolean @default(false)
   wicketType  String?
   dismissedId String?
-  dismissed   Player? @relation("Dismissed", fields: [dismissedId], references: [id])
+  dismissed   Player? @relation("Dismissed", fields: [dismissedId], references: [id], onDelete: Cascade)
   fielderId   String?
-  fielder     Player? @relation("Fielder", fields: [fielderId], references: [id])
+  fielder     Player? @relation("Fielder", fields: [fielderId], references: [id], onDelete: Cascade)
 
   isFreeHit Boolean  @default(false)
   createdAt DateTime @default(now())

@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { requireAdmin } from '../auth.js';
 import { getMatchState } from '../matchState.js';
 import { emitMatchUpdate } from '../sockets.js';
+import { asyncHandler } from '../asyncHandler.js';
 
 const router = Router();
 
@@ -13,13 +14,13 @@ async function sendState(res, matchId) {
   res.json(state);
 }
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', asyncHandler(async (req, res) => {
   const state = await getMatchState(req.params.id);
   if (!state) return res.status(404).json({ error: 'Match not found' });
   res.json(state);
-});
+}));
 
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', requireAdmin, asyncHandler(async (req, res) => {
   const { tournamentId, teamAId, teamBId, oversLimit, venue, scheduledAt } = req.body || {};
   if (!tournamentId || !teamAId || !teamBId) {
     return res.status(400).json({ error: 'tournamentId, teamAId and teamBId are required' });
@@ -36,9 +37,9 @@ router.post('/', requireAdmin, async (req, res) => {
     },
   });
   res.status(201).json(match);
-});
+}));
 
-router.patch('/:id', requireAdmin, async (req, res) => {
+router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const { oversLimit, venue, scheduledAt } = req.body || {};
   const match = await prisma.match.update({
     where: { id: req.params.id },
@@ -49,15 +50,15 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     },
   });
   res.json(match);
-});
+}));
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   await prisma.match.delete({ where: { id: req.params.id } });
   res.status(204).end();
-});
+}));
 
 // --- Toss: decides who bats first and opens innings 1 ---
-router.post('/:id/toss', requireAdmin, async (req, res) => {
+router.post('/:id/toss', requireAdmin, asyncHandler(async (req, res) => {
   const { tossWinnerTeamId, tossDecision } = req.body || {};
   const match = await prisma.match.findUnique({ where: { id: req.params.id } });
   if (!match) return res.status(404).json({ error: 'Match not found' });
@@ -82,10 +83,10 @@ router.post('/:id/toss', requireAdmin, async (req, res) => {
   ]);
 
   await sendState(res, match.id);
-});
+}));
 
 // --- Set opening lineup for an innings (must happen before ball 1) ---
-router.post('/:id/lineup', requireAdmin, async (req, res) => {
+router.post('/:id/lineup', requireAdmin, asyncHandler(async (req, res) => {
   const { inningsId, strikerId, nonStrikerId, bowlerId } = req.body || {};
   if (!inningsId || !strikerId || !nonStrikerId || !bowlerId) {
     return res.status(400).json({ error: 'inningsId, strikerId, nonStrikerId and bowlerId are required' });
@@ -96,10 +97,10 @@ router.post('/:id/lineup', requireAdmin, async (req, res) => {
     data: { openingStrikerId: strikerId, openingNonStrikerId: nonStrikerId, openingBowlerId: bowlerId },
   });
   await sendState(res, req.params.id);
-});
+}));
 
 // --- Start second innings once the first has finished ---
-router.post('/:id/start-second-innings', requireAdmin, async (req, res) => {
+router.post('/:id/start-second-innings', requireAdmin, asyncHandler(async (req, res) => {
   const match = await prisma.match.findUnique({ where: { id: req.params.id }, include: { innings: true } });
   if (!match) return res.status(404).json({ error: 'Match not found' });
   const first = match.innings.find((i) => i.inningsNumber === 1);
@@ -124,10 +125,10 @@ router.post('/:id/start-second-innings', requireAdmin, async (req, res) => {
   ]);
 
   await sendState(res, match.id);
-});
+}));
 
 // --- Record one ball ---
-router.post('/:id/ball', requireAdmin, async (req, res) => {
+router.post('/:id/ball', requireAdmin, asyncHandler(async (req, res) => {
   const {
     inningsId,
     expectedSequence,
@@ -200,10 +201,10 @@ router.post('/:id/ball', requireAdmin, async (req, res) => {
 
   await maybeFinishInningsOrMatch(req.params.id, inningsId);
   await sendState(res, req.params.id);
-});
+}));
 
 // --- Undo the last ball recorded in an innings ---
-router.post('/:id/undo', requireAdmin, async (req, res) => {
+router.post('/:id/undo', requireAdmin, asyncHandler(async (req, res) => {
   const { inningsId } = req.body || {};
   if (!inningsId) return res.status(400).json({ error: 'inningsId is required' });
   const last = await prisma.ball.findFirst({ where: { inningsId }, orderBy: { sequence: 'desc' } });
@@ -212,7 +213,7 @@ router.post('/:id/undo', requireAdmin, async (req, res) => {
   await prisma.innings.update({ where: { id: inningsId }, data: { isCompleted: false } });
   await prisma.match.updateMany({ where: { id: req.params.id, status: 'COMPLETED' }, data: { status: 'LIVE', winnerTeamId: null, resultText: null } });
   await sendState(res, req.params.id);
-});
+}));
 
 async function maybeFinishInningsOrMatch(matchId, inningsId) {
   const state = await getMatchState(matchId);

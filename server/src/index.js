@@ -25,8 +25,20 @@ app.use('/api/matches', matchRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
+  if (err?.code === 'P2025') {
+    return res.status(404).json({ error: 'Record not found' });
+  }
+  if (err?.code === 'P2003' || err?.code === '23503' || err?.code === '23001') {
+    return res.status(409).json({ error: 'This action conflicts with related data and cannot be completed' });
+  }
   res.status(500).json({ error: 'Internal server error' });
 });
+
+// Last-resort safety net: every route is already wrapped with asyncHandler,
+// so this should never fire in practice. It exists purely so an unforeseen
+// error logs instead of silently taking the whole live-scoring app down.
+process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
+process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
 
 const server = http.createServer(app);
 const port = process.env.PORT || 4000;
