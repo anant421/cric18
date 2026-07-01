@@ -20,12 +20,12 @@ export default function BowlingTable({ rows, bowlerId }) {
             <tr key={p.playerId} className="border-b border-border/50 last:border-0">
               <td className="px-4 py-2.5 font-medium">
                 {p.name}
-                {p.playerId === bowlerId && <span className="ml-1 text-brand">*</span>}
+                {p.playerId === bowlerId && <span className="ml-1 text-gold">*</span>}
               </td>
               <td className="px-2 py-2.5 text-center text-slate-600">{p.oversStr}</td>
               <td className="px-2 py-2.5 text-center text-slate-600">{p.maidens}</td>
               <td className="px-2 py-2.5 text-center text-slate-600">{p.runsConceded}</td>
-              <td className="px-2 py-2.5 text-center font-bold text-brand">{p.wickets}</td>
+              <td className="px-2 py-2.5 text-center font-bold text-gold">{p.wickets}</td>
               <td className="px-2 py-2.5 text-center text-slate-600">{p.economy}</td>
             </tr>
           ))}

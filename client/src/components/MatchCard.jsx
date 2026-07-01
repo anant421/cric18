@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const statusPill = {
   LIVE: 'bg-live/15 text-live',
   SCHEDULED: 'bg-slate-500/15 text-slate-600',
-  COMPLETED: 'bg-brand/15 text-brand',
+  COMPLETED: 'bg-navy text-brand',
   ABANDONED: 'bg-slate-500/15 text-slate-500',
 };
 
@@ -25,7 +25,7 @@ export default function MatchCard({ match }) {
         <TeamRow team={match.teamA} isWinner={match.winnerTeamId === match.teamAId} score={match.scoreA} />
         <TeamRow team={match.teamB} isWinner={match.winnerTeamId === match.teamBId} score={match.scoreB} />
       </div>
-      {match.resultText && <p className="mt-3 text-sm font-medium text-brand">{match.resultText}</p>}
+      {match.resultText && <p className="mt-3 text-sm font-medium text-gold">{match.resultText}</p>}
       {!match.resultText && match.scheduledAt && (
         <p className="mt-3 text-xs text-slate-400">{new Date(match.scheduledAt).toLocaleString()}</p>
       )}
@@ -41,7 +41,7 @@ function TeamRow({ team, isWinner, score }) {
       </span>
       <div className="flex items-center gap-2">
         {score && <span className="text-sm font-semibold tabular-nums text-navy">{score}</span>}
-        {isWinner && <span className="text-xs text-brand">Won</span>}
+        {isWinner && <span className="text-xs font-semibold text-gold">Won</span>}
       </div>
     </div>
   );

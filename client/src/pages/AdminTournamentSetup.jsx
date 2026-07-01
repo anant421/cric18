@@ -34,7 +34,7 @@ export default function AdminTournamentSetup() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-semibold ${tab === t ? 'border-b-2 border-brand text-brand' : 'text-slate-500'}`}
+            className={`px-4 py-2.5 text-sm font-semibold ${tab === t ? 'border-b-2 border-brand text-navy' : 'text-slate-500'}`}
           >
             {t}
           </button>

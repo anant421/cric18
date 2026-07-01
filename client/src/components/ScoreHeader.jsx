@@ -42,7 +42,7 @@ export default function ScoreHeader({ match, innings }) {
 
       {innings.target != null && !s.isDone && (
         <div className="mt-4 rounded-lg bg-surface2 px-4 py-2.5 text-sm text-slate-600">
-          Need <span className="font-bold text-brand">{innings.runsNeeded}</span> runs off{' '}
+          Need <span className="font-bold text-gold">{innings.runsNeeded}</span> runs off{' '}
           <span className="font-bold">{innings.ballsRemaining}</span> balls · RRR{' '}
           <span className="font-bold">{innings.requiredRunRate}</span>
         </div>

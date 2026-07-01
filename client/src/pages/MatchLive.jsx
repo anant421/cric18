@@ -48,7 +48,7 @@ export default function MatchLive() {
       </div>
 
       {match.resultText && (
-        <div className="card mb-5 p-4 text-center font-semibold text-brand">{match.resultText}</div>
+        <div className="card mb-5 p-4 text-center font-semibold text-gold">{match.resultText}</div>
       )}
 
       {match.tossWinnerTeamId && (
@@ -77,7 +77,7 @@ export default function MatchLive() {
                 setInningsTab(i);
               }}
               className={`px-3 py-2 text-sm font-semibold ${
-                view === 'scorecard' && inningsTab === i ? 'border-b-2 border-brand text-brand' : 'text-slate-500'
+                view === 'scorecard' && inningsTab === i ? 'border-b-2 border-brand text-navy' : 'text-slate-500'
               }`}
             >
               Innings {inn.inningsNumber}
@@ -85,7 +85,7 @@ export default function MatchLive() {
           ))}
           <button
             onClick={() => setView('live')}
-            className={`ml-auto px-3 py-2 text-sm font-semibold ${view === 'live' ? 'border-b-2 border-brand text-brand' : 'text-slate-500'}`}
+            className={`ml-auto px-3 py-2 text-sm font-semibold ${view === 'live' ? 'border-b-2 border-brand text-navy' : 'text-slate-500'}`}
           >
             Live
           </button>

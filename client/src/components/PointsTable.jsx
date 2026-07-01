@@ -26,11 +26,11 @@ export default function PointsTable({ rows }) {
               <td className="px-3 py-2.5 text-center text-slate-600">{r.won}</td>
               <td className="px-3 py-2.5 text-center text-slate-600">{r.lost}</td>
               <td className="px-3 py-2.5 text-center text-slate-600">{r.tied}</td>
-              <td className={`px-3 py-2.5 text-center tabular-nums ${r.nrr > 0 ? 'text-brand' : r.nrr < 0 ? 'text-live' : 'text-slate-600'}`}>
+              <td className={`px-3 py-2.5 text-center tabular-nums ${r.nrr > 0 ? 'text-gold' : r.nrr < 0 ? 'text-live' : 'text-slate-600'}`}>
                 {r.nrr > 0 ? '+' : ''}
                 {r.nrr.toFixed(3)}
               </td>
-              <td className="px-3 py-2.5 text-center font-bold text-brand">{r.points}</td>
+              <td className="px-3 py-2.5 text-center font-bold text-gold">{r.points}</td>
             </tr>
           ))}
         </tbody>

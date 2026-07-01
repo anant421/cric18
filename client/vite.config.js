@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'ScoreXI - Live Cricket Scoring',
         short_name: 'ScoreXI',
         description: 'Live cricket scoring for your office cricket tournament.',
-        theme_color: '#155EEF',
-        background_color: '#F6F8FB',
+        theme_color: '#111111',
+        background_color: '#F5F1E8',
         display: 'standalone',
         start_url: '/',
         icons: [

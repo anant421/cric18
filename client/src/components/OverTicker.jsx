@@ -3,8 +3,8 @@ import React from 'react';
 const chipStyle = (b) => {
   if (b === 'W') return 'bg-live text-white';
   if (b.startsWith('Wd') || b.startsWith('Nb')) return 'bg-accent/80 text-white';
-  if (b === '4') return 'bg-brand/80 text-white';
-  if (b === '6') return 'bg-brand text-white';
+  if (b === '4') return 'bg-brand/80 text-navy';
+  if (b === '6') return 'bg-brand text-navy';
   return 'bg-surface2 text-navy';
 };
 

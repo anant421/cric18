@@ -4,30 +4,32 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#F6F8FB',
+        bg: '#F5F1E8',
         surface: '#FFFFFF',
-        surface2: '#F1F5F9',
-        border: '#E2E8F0',
+        surface2: '#F0EBDF',
+        border: '#E4DFD2',
         navy: {
-          DEFAULT: '#0B1F3A',
-          light: '#233A5E',
+          DEFAULT: '#111111',
+          light: '#3A3A3A',
         },
         brand: {
-          DEFAULT: '#155EEF',
-          dark: '#0B4ECB',
-          light: '#E8F0FE',
+          DEFAULT: '#FFC800',
+          dark: '#E0AD00',
+          light: '#FFF6DA',
         },
         accent: {
-          DEFAULT: '#0AAFC4',
-          dark: '#088A9A',
-          light: '#E3F8FA',
+          DEFAULT: '#111111',
+          dark: '#000000',
+          light: '#F0EBDF',
         },
         live: '#E11D48',
-        gold: '#D4A72C',
+        // Darker than `brand` - used for readable text/numbers on light
+        // backgrounds, where the bright button-yellow fails contrast.
+        gold: '#8A6D00',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['"Bebas Neue"', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['"Source Serif 4"', 'Georgia', 'serif'],
       },
       boxShadow: {
         card: '0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)',

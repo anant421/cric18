@@ -15,9 +15,9 @@ export default function Home() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-8 rounded-2xl bg-gradient-to-br from-navy to-brand p-8 text-center text-white shadow-cardHover">
-        <h1 className="font-display text-5xl tracking-wide sm:text-6xl">SCORE XI</h1>
-        <p className="mt-2 text-white/80">Live scores, scorecards and stats for every office cricket tournament.</p>
+      <div className="mb-8 rounded-2xl bg-navy p-8 text-center shadow-cardHover sm:p-12">
+        <h1 className="font-display text-4xl text-brand sm:text-5xl">Score every over, live.</h1>
+        <p className="mt-3 text-white/70">Live scores, scorecards and stats for every office cricket tournament.</p>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

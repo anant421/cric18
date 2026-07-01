@@ -66,7 +66,7 @@ export default function AdminScoring() {
       {notice && <div className="mb-4 rounded-lg bg-accent/15 px-4 py-2.5 text-sm text-accent">{notice}</div>}
 
       {match.status === 'COMPLETED' && (
-        <div className="card mb-5 p-4 text-center font-semibold text-brand">{match.resultText}</div>
+        <div className="card mb-5 p-4 text-center font-semibold text-gold">{match.resultText}</div>
       )}
 
       {needsToss && (
@@ -133,7 +133,7 @@ function TossForm({ match, token, onDone, onError }) {
             key={t.id}
             onClick={() => setTossWinnerTeamId(t.id)}
             className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${
-              tossWinnerTeamId === t.id ? 'bg-brand text-white' : 'bg-surface2 text-slate-600'
+              tossWinnerTeamId === t.id ? 'bg-brand text-navy' : 'bg-surface2 text-slate-600'
             }`}
           >
             {t.name}
@@ -147,7 +147,7 @@ function TossForm({ match, token, onDone, onError }) {
             key={d}
             onClick={() => setTossDecision(d)}
             className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${
-              tossDecision === d ? 'bg-brand text-white' : 'bg-surface2 text-slate-600'
+              tossDecision === d ? 'bg-brand text-navy' : 'bg-surface2 text-slate-600'
             }`}
           >
             {d === 'BAT' ? 'Bat' : 'Bowl'}

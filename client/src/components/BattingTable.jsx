@@ -21,7 +21,7 @@ export default function BattingTable({ rows, strikerId }) {
               <td className="px-4 py-2.5">
                 <div className="font-medium">
                   {p.name}
-                  {p.playerId === strikerId && <span className="ml-1 text-brand">*</span>}
+                  {p.playerId === strikerId && <span className="ml-1 text-gold">*</span>}
                 </div>
                 <div className="text-xs text-slate-400">{p.isOut ? p.dismissal : 'not out'}</div>
               </td>

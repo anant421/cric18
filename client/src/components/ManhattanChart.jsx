@@ -1,6 +1,6 @@
 import React from 'react';
 
-const SERIES_COLORS = ['#155EEF', '#0AAFC4'];
+const SERIES_COLORS = ['#111111', '#FFC800'];
 
 export default function ManhattanChart({ innings, teamName }) {
   const withOvers = innings.filter((inn) => inn.overByOver.length > 0);
@@ -37,7 +37,7 @@ export default function ManhattanChart({ innings, teamName }) {
           y1={height - padding.bottom}
           x2={width - padding.right}
           y2={height - padding.bottom}
-          stroke="#E2E8F0"
+          stroke="#E4DFD2"
         />
         {Array.from({ length: maxOver }).map((_, overIdx) => (
           <text

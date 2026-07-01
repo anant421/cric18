@@ -87,7 +87,7 @@ export default function TournamentPage() {
             key={t}
             onClick={() => setTab(t)}
             className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
-              tab === t ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-navy'
+              tab === t ? 'border-brand text-navy' : 'border-transparent text-slate-500 hover:text-navy'
             }`}
           >
             {t}

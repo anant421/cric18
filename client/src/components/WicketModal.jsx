@@ -69,7 +69,7 @@ export default function WicketModal({ strikerId, strikerName, nonStrikerId, nonS
                 <button
                   key={r}
                   onClick={() => setRuns(r)}
-                  className={`btn ${runs === r ? 'bg-brand text-white' : 'bg-surface2 text-slate-600'}`}
+                  className={`btn ${runs === r ? 'bg-brand text-navy' : 'bg-surface2 text-slate-600'}`}
                 >
                   {r}
                 </button>

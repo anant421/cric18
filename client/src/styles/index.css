@@ -28,7 +28,7 @@ body {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none;
   }
   .btn-primary {
-    @apply btn bg-brand text-white hover:bg-brand-dark shadow-sm;
+    @apply btn bg-brand text-navy hover:bg-brand-dark shadow-sm;
   }
   .btn-secondary {
     @apply btn bg-white text-navy border border-border hover:bg-surface2;
@@ -51,8 +51,5 @@ body {
   .live-dot::after {
     content: '';
     @apply absolute inset-0 rounded-full bg-live animate-ping;
-  }
-  .avatar {
-    @apply inline-flex items-center justify-center rounded-full bg-brand-light text-brand font-bold overflow-hidden shrink-0;
   }
 }
