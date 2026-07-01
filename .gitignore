@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+dev-dist/
+.env
+.env.local
+*.db
+*.db-journal
+.vite/
+.DS_Store
+Thumbs.db
+*.log

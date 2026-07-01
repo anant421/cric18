@@ -1,0 +1,148 @@
+// Boundary - Prisma schema
+// PostgreSQL datasource (works locally against a local Postgres, or a hosted
+// instance like Neon, via DATABASE_URL). Enum-like fields are plain Strings
+// validated in application code (see src/routes and src/scoring.js) rather
+// than native Postgres enums, so this schema is easy to point at any SQL
+// database without extra type work.
+// Valid values:
+//   PlayerRole:   BATSMAN | BOWLER | ALLROUNDER | WICKETKEEPER
+//   MatchStatus:  SCHEDULED | LIVE | COMPLETED | ABANDONED
+//   TossDecision: BAT | BOWL
+//   ExtraType:    NONE | WIDE | NOBALL | BYE | LEGBYE
+//   WicketType:   BOWLED | CAUGHT | LBW | RUNOUT | STUMPED | HITWICKET | RETIRED
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tournament {
+  id        String   @id @default(cuid())
+  name      String
+  season    String?
+  createdAt DateTime @default(now())
+
+  teams   Team[]
+  players Player[]
+  matches Match[]
+}
+
+model Team {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  name         String
+  shortName    String
+  colorHex     String     @default("#1d9bf0")
+  createdAt    DateTime   @default(now())
+
+  players       Player[]
+  homeMatches   Match[] @relation("TeamA")
+  awayMatches   Match[] @relation("TeamB")
+  tossWinsAsRef Match[] @relation("TossWinner")
+  wonMatches    Match[] @relation("WinnerTeam")
+}
+
+model Player {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamId       String
+  team         Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  name         String
+  role         String     @default("BATSMAN")
+  battingStyle String?
+  bowlingStyle String?
+  createdAt    DateTime   @default(now())
+
+  ballsAsStriker    Ball[] @relation("Striker")
+  ballsAsNonStriker Ball[] @relation("NonStriker")
+  ballsAsBowler     Ball[] @relation("Bowler")
+  ballsAsDismissed  Ball[] @relation("Dismissed")
+  ballsAsFielder    Ball[] @relation("Fielder")
+}
+
+model Match {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamAId      String
+  teamA        Team       @relation("TeamA", fields: [teamAId], references: [id])
+  teamBId      String
+  teamB        Team       @relation("TeamB", fields: [teamBId], references: [id])
+  oversLimit   Int        @default(8)
+  venue        String?
+  scheduledAt  DateTime?
+  status       String     @default("SCHEDULED")
+
+  tossWinnerTeamId String?
+  tossWinnerTeam    Team?   @relation("TossWinner", fields: [tossWinnerTeamId], references: [id])
+  tossDecision      String?
+
+  currentInningsNumber Int @default(0)
+
+  winnerTeamId String?
+  winnerTeam   Team?   @relation("WinnerTeam", fields: [winnerTeamId], references: [id])
+  resultText   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  innings Innings[]
+}
+
+model Innings {
+  id            String  @id @default(cuid())
+  matchId       String
+  match         Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  inningsNumber Int
+  battingTeamId String
+  bowlingTeamId String
+  target        Int?
+  isCompleted   Boolean @default(false)
+
+  openingStrikerId    String?
+  openingNonStrikerId String?
+  openingBowlerId     String?
+
+  createdAt DateTime @default(now())
+
+  balls Ball[]
+}
+
+model Ball {
+  id         String  @id @default(cuid())
+  inningsId  String
+  innings    Innings @relation(fields: [inningsId], references: [id], onDelete: Cascade)
+  sequence   Int
+  overNumber Int
+  ballInOver Int
+  isLegal    Boolean
+
+  strikerId    String
+  striker      Player @relation("Striker", fields: [strikerId], references: [id])
+  nonStrikerId String
+  nonStriker   Player @relation("NonStriker", fields: [nonStrikerId], references: [id])
+  bowlerId     String
+  bowler       Player @relation("Bowler", fields: [bowlerId], references: [id])
+
+  runsBat   Int    @default(0)
+  extraType String @default("NONE")
+  extraRuns Int    @default(0)
+
+  isWicket    Boolean @default(false)
+  wicketType  String?
+  dismissedId String?
+  dismissed   Player? @relation("Dismissed", fields: [dismissedId], references: [id])
+  fielderId   String?
+  fielder     Player? @relation("Fielder", fields: [fielderId], references: [id])
+
+  isFreeHit Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([inningsId, sequence])
+}
