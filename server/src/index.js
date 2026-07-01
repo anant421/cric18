@@ -11,9 +11,14 @@ import playerRoutes from './routes/players.routes.js';
 import matchRoutes from './routes/matches.routes.js';
 
 const app = express();
-const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+// Supports a comma-separated list so both a production frontend and local
+// dev can talk to the same deployed API, e.g. "https://app.vercel.app,http://localhost:5173"
+const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 
-app.use(cors({ origin: clientOrigin }));
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -43,7 +48,7 @@ process.on('uncaughtException', (err) => console.error('Uncaught exception:', er
 const server = http.createServer(app);
 const port = process.env.PORT || 4000;
 
-initSockets(server, clientOrigin).then(() => {
+initSockets(server, allowedOrigins).then(() => {
   server.listen(port, () => {
     console.log(`CPL Scorer API listening on http://localhost:${port}`);
   });
