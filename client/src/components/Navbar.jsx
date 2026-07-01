@@ -9,14 +9,9 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link to="/" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy text-sm font-extrabold tracking-wide text-brand shadow-sm">
-            XI
-          </span>
-          <span className="leading-tight">
-            <span className="block text-lg font-extrabold tracking-tight text-navy">SCOREXI</span>
-            <span className="block text-[11px] font-medium text-slate-500">Live Cricket Scoring</span>
-          </span>
+        <Link to="/" className="leading-tight">
+          <span className="block text-2xl font-extrabold tracking-tight text-navy">CDATA</span>
+          <span className="block text-[11px] font-medium tracking-wide text-slate-500">ScoreXI · Live Cricket Scoring</span>
         </Link>
         <div className="flex items-center gap-2">
           {isAdmin ? (
