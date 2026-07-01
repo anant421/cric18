@@ -10,8 +10,8 @@ export default defineConfig({
       devOptions: { enabled: true },
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Boundary - Live Cricket Scoring',
-        short_name: 'Boundary',
+        name: 'ScoreXI - Live Cricket Scoring',
+        short_name: 'ScoreXI',
         description: 'Live cricket scoring for your office cricket tournament.',
         theme_color: '#155EEF',
         background_color: '#F6F8FB',

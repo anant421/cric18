@@ -1,4 +1,4 @@
-# Boundary — Live Cricket Scoring
+# ScoreXI — Live Cricket Scoring
 
 A live cricket scoring web app: ball-by-ball scoring for admins, real-time
 read-only scorecards/stats for everyone else. Built for an office cricket

@@ -1,4 +1,4 @@
-// Boundary - Prisma schema
+// ScoreXI - Prisma schema
 // PostgreSQL datasource (works locally against a local Postgres, or a hosted
 // instance like Neon, via DATABASE_URL). Enum-like fields are plain Strings
 // validated in application code (see src/routes and src/scoring.js) rather
