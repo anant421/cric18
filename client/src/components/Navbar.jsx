@@ -11,14 +11,11 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/95 backdrop-blur">
-      <div className="mx-auto grid max-w-6xl grid-cols-2 items-center gap-2 px-4 py-3 sm:grid-cols-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link to="/" className="flex items-center">
           <img src="/cdata-logo.svg" alt="CDATA" className="h-6" />
         </Link>
-        <Link to="/" className="hidden text-center text-sm font-bold tracking-wide text-brand sm:block">
-          CData Premier League
-        </Link>
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2">
           {isAdmin ? (
             <>
               <Link to="/admin" className={ghostBtn}>
