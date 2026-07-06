@@ -9,16 +9,16 @@ export default {
         surface2: '#F0EBDF',
         border: '#E4DFD2',
         navy: {
-          DEFAULT: '#111111',
-          light: '#3A3A3A',
+          DEFAULT: '#15151C',
+          light: '#3A3A42',
         },
         brand: {
-          DEFAULT: '#FFC800',
-          dark: '#E0AD00',
-          light: '#FFF6DA',
+          DEFAULT: '#FFE500',
+          dark: '#E0C900',
+          light: '#FFF8CC',
         },
         accent: {
-          DEFAULT: '#111111',
+          DEFAULT: '#15151C',
           dark: '#000000',
           light: '#F0EBDF',
         },

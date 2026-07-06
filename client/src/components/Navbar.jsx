@@ -12,8 +12,8 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/95 backdrop-blur">
       <div className="mx-auto grid max-w-6xl grid-cols-2 items-center gap-2 px-4 py-3 sm:grid-cols-3">
-        <Link to="/" className="text-2xl font-extrabold tracking-tight text-brand">
-          CDATA
+        <Link to="/" className="flex items-center">
+          <img src="/cdata-logo.svg" alt="CDATA" className="h-6" />
         </Link>
         <Link to="/" className="hidden text-center text-sm font-bold tracking-wide text-brand sm:block">
           CData Premier League
