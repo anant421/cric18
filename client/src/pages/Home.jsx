@@ -91,8 +91,8 @@ export default function Home() {
 
   const Hero = ({ children }) => (
     <div className="mb-8 rounded-2xl bg-navy p-8 text-center shadow-cardHover sm:p-12">
-      <h1 className="font-display text-4xl text-brand sm:text-5xl">Score every over, live.</h1>
-      <p className="mt-3 text-white/70">Live scores, scorecards and stats for the CData Premier League.</p>
+      <h1 className="font-display text-4xl text-brand sm:text-6xl">CData Premier League</h1>
+      <p className="mt-3 text-white/70">Score every over, live — scores, scorecards and stats for every match.</p>
       {children}
     </div>
   );

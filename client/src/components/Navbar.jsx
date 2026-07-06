@@ -6,23 +6,26 @@ export default function Navbar() {
   const { isAdmin, logout } = useAuth();
   const navigate = useNavigate();
 
+  const ghostBtn =
+    'inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/20 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 active:scale-95';
+
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/95 backdrop-blur">
       <div className="mx-auto grid max-w-6xl grid-cols-2 items-center gap-2 px-4 py-3 sm:grid-cols-3">
-        <Link to="/" className="text-2xl font-extrabold tracking-tight text-navy">
+        <Link to="/" className="text-2xl font-extrabold tracking-tight text-brand">
           CDATA
         </Link>
-        <Link to="/" className="hidden text-center text-sm font-bold tracking-wide text-navy sm:block">
+        <Link to="/" className="hidden text-center text-sm font-bold tracking-wide text-brand sm:block">
           CData Premier League
         </Link>
         <div className="flex items-center justify-end gap-2">
           {isAdmin ? (
             <>
-              <Link to="/admin" className="btn-secondary">
+              <Link to="/admin" className={ghostBtn}>
                 Admin
               </Link>
               <button
-                className="btn-secondary"
+                className={ghostBtn}
                 onClick={() => {
                   logout();
                   navigate('/');
@@ -32,7 +35,7 @@ export default function Navbar() {
               </button>
             </>
           ) : (
-            <Link to="/admin/login" className="btn-primary">
+            <Link to="/admin/login" className="btn-primary rounded-full">
               Admin Login
             </Link>
           )}
