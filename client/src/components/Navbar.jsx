@@ -8,12 +8,14 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link to="/" className="leading-tight">
-          <span className="block text-2xl font-extrabold tracking-tight text-navy">CDATA</span>
-          <span className="block text-[11px] font-medium tracking-wide text-slate-500">ScoreXI · Live Cricket Scoring</span>
+      <div className="mx-auto grid max-w-6xl grid-cols-2 items-center gap-2 px-4 py-3 sm:grid-cols-3">
+        <Link to="/" className="text-2xl font-extrabold tracking-tight text-navy">
+          CDATA
         </Link>
-        <div className="flex items-center gap-2">
+        <Link to="/" className="hidden text-center text-sm font-bold tracking-wide text-navy sm:block">
+          CData Premier League
+        </Link>
+        <div className="flex items-center justify-end gap-2">
           {isAdmin ? (
             <>
               <Link to="/admin" className="btn-secondary">

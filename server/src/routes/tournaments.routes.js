@@ -13,16 +13,41 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json(tournaments);
 }));
 
+const tournamentDetailInclude = {
+  teams: { include: { players: true } },
+  matches: {
+    include: { teamA: true, teamB: true, winnerTeam: true },
+    orderBy: { scheduledAt: 'asc' },
+  },
+};
+
+// This app is dedicated to a single tournament (CData Premier League).
+// These two routes must be registered before the generic "/:id" route below,
+// otherwise Express would match "cpl" as an :id param instead.
+router.get('/cpl', asyncHandler(async (req, res) => {
+  const t = await prisma.tournament.findFirst({
+    orderBy: { createdAt: 'asc' },
+    include: tournamentDetailInclude,
+  });
+  if (!t) return res.status(404).json({ error: 'not_initialized' });
+  res.json(t);
+}));
+
+router.post('/cpl/init', requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.tournament.findFirst({
+    orderBy: { createdAt: 'asc' },
+    include: tournamentDetailInclude,
+  });
+  if (existing) return res.json(existing);
+  const created = await prisma.tournament.create({ data: { name: 'CData Premier League' } });
+  const full = await prisma.tournament.findUnique({ where: { id: created.id }, include: tournamentDetailInclude });
+  res.status(201).json(full);
+}));
+
 router.get('/:id', asyncHandler(async (req, res) => {
   const t = await prisma.tournament.findUnique({
     where: { id: req.params.id },
-    include: {
-      teams: { include: { players: true } },
-      matches: {
-        include: { teamA: true, teamB: true, winnerTeam: true },
-        orderBy: { scheduledAt: 'asc' },
-      },
-    },
+    include: tournamentDetailInclude,
   });
   if (!t) return res.status(404).json({ error: 'Tournament not found' });
   res.json(t);

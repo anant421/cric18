@@ -79,8 +79,11 @@ export function battingCard(balls, teamPlayers, allPlayers = teamPlayers) {
     }
   });
   return [...map.values()]
-    .filter((p) => p.didBat)
-    .sort((a, b) => a.battedAt - b.battedAt)
+    // A non-striker who is run out without ever facing a ball still needs to
+    // show up (and count as unavailable for the next-batsman picker) even
+    // though they never "batted" in the didBat sense.
+    .filter((p) => p.didBat || p.isOut)
+    .sort((a, b) => (a.battedAt ?? Infinity) - (b.battedAt ?? Infinity))
     .map((p) => ({
       ...p,
       strikeRate: p.balls > 0 ? Number(((p.runs / p.balls) * 100).toFixed(2)) : 0,

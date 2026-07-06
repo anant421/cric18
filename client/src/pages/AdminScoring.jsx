@@ -56,7 +56,7 @@ export default function AdminScoring() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
-      <Link to={`/admin/tournaments/${match.tournamentId}`} className="text-sm text-slate-500 hover:text-navy">
+      <Link to="/admin" className="text-sm text-slate-500 hover:text-navy">
         &larr; Back to setup
       </Link>
       <h1 className="mt-2 mb-5 text-xl font-bold">

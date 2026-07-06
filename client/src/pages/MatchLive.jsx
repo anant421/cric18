@@ -36,7 +36,7 @@ export default function MatchLive() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <Link to={`/tournaments/${match.tournamentId}`} className="text-sm text-slate-500 hover:text-navy">
+      <Link to="/" className="text-sm text-slate-500 hover:text-navy">
         &larr; {match.tournamentName}
       </Link>
 
@@ -56,15 +56,6 @@ export default function MatchLive() {
           {match.tossWinnerTeamId === match.teamA.id ? match.teamA.name : match.teamB.name} won the toss and chose to{' '}
           {match.tossDecision === 'BAT' ? 'bat' : 'bowl'}.
         </p>
-      )}
-
-      {match.innings.length > 0 && (
-        <div className="mb-5">
-          <ManhattanChart
-            innings={match.innings}
-            teamName={(teamId) => (teamId === match.teamA.id ? match.teamA.shortName : match.teamB.shortName)}
-          />
-        </div>
       )}
 
       {match.innings.length > 1 && (
@@ -119,6 +110,15 @@ export default function MatchLive() {
       ) : (
         <ScorecardView innings={scorecardInnings} />
       )}
+
+      {match.innings.length > 0 && (
+        <div className="mt-5">
+          <ManhattanChart
+            innings={match.innings}
+            teamName={(teamId) => (teamId === match.teamA.id ? match.teamA.shortName : match.teamB.shortName)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -139,9 +139,18 @@ function ScorecardView({ innings }) {
       {innings.fallOfWickets.length > 0 && (
         <div className="card p-4">
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Fall of Wickets</h3>
-          <p className="text-sm leading-relaxed text-slate-600">
-            {innings.fallOfWickets.map((w) => `${w.score}-${w.wicketNumber} (${w.playerName}, ${w.overStr} ov)`).join(', ')}
-          </p>
+          <ul className="space-y-1.5 text-sm text-slate-600">
+            {innings.fallOfWickets.map((w) => (
+              <li key={w.wicketNumber} className="flex justify-between border-b border-border/60 pb-1.5 last:border-0 last:pb-0">
+                <span>
+                  {w.wicketNumber}. {w.playerName}
+                </span>
+                <span className="tabular-nums text-slate-500">
+                  {w.score} ({w.overStr} ov)
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
