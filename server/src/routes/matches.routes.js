@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { requireAdmin } from '../auth.js';
-import { getMatchState } from '../matchState.js';
+import { getMatchState, invalidateMatchState } from '../matchState.js';
 import { emitMatchUpdate } from '../sockets.js';
 import { asyncHandler } from '../asyncHandler.js';
 import { computeAwardPoints } from '../scoring.js';
@@ -50,11 +50,13 @@ router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
       scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
     },
   });
+  invalidateMatchState(req.params.id);
   res.json(match);
 }));
 
 router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   await prisma.match.delete({ where: { id: req.params.id } });
+  invalidateMatchState(req.params.id);
   res.status(204).end();
 }));
 
@@ -83,6 +85,7 @@ router.post('/:id/toss', requireAdmin, asyncHandler(async (req, res) => {
     }),
   ]);
 
+  invalidateMatchState(match.id);
   await sendState(res, match.id);
 }));
 
@@ -97,6 +100,7 @@ router.post('/:id/lineup', requireAdmin, asyncHandler(async (req, res) => {
     where: { id: inningsId },
     data: { openingStrikerId: strikerId, openingNonStrikerId: nonStrikerId, openingBowlerId: bowlerId },
   });
+  invalidateMatchState(req.params.id);
   await sendState(res, req.params.id);
 }));
 
@@ -125,6 +129,7 @@ router.post('/:id/start-second-innings', requireAdmin, asyncHandler(async (req, 
     }),
   ]);
 
+  invalidateMatchState(match.id);
   await sendState(res, match.id);
 }));
 
@@ -200,6 +205,7 @@ router.post('/:id/ball', requireAdmin, asyncHandler(async (req, res) => {
     },
   });
 
+  invalidateMatchState(req.params.id);
   await maybeFinishInningsOrMatch(req.params.id, inningsId);
   await sendState(res, req.params.id);
 }));
@@ -213,6 +219,7 @@ router.post('/:id/undo', requireAdmin, asyncHandler(async (req, res) => {
   await prisma.ball.delete({ where: { id: last.id } });
   await prisma.innings.update({ where: { id: inningsId }, data: { isCompleted: false } });
   await prisma.match.updateMany({ where: { id: req.params.id, status: 'COMPLETED' }, data: { status: 'LIVE', winnerTeamId: null, resultText: null, manOfMatchId: null } });
+  invalidateMatchState(req.params.id);
   await sendState(res, req.params.id);
 }));
 
@@ -222,6 +229,7 @@ async function maybeFinishInningsOrMatch(matchId, inningsId) {
   if (!inn || !inn.summary.isDone) return;
 
   await prisma.innings.update({ where: { id: inningsId }, data: { isCompleted: true } });
+  invalidateMatchState(matchId);
 
   if (inn.inningsNumber === 2) {
     const first = state.innings.find((i) => i.inningsNumber === 1);
@@ -255,6 +263,7 @@ async function maybeFinishInningsOrMatch(matchId, inningsId) {
       where: { id: matchId },
       data: { status: 'COMPLETED', winnerTeamId, resultText, manOfMatchId },
     });
+    invalidateMatchState(matchId);
   }
 }
 

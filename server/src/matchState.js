@@ -13,6 +13,19 @@ function ballKind(ball) {
   return ball.extraType === 'NONE' ? 'RUN' : ball.extraType;
 }
 
+// Many viewers read the same match state between balls; recomputing the full
+// scorecard from the database for every single one of them is wasteful and
+// is what makes the app feel laggy under concurrent load. Every write path
+// (ball, toss, lineup, undo, etc.) calls invalidateMatchState() right before
+// broadcasting, so cached readers never see stale data - the TTL below is
+// purely a safety net in case a future write path forgets to invalidate.
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const cache = new Map();
+
+export function invalidateMatchState(matchId) {
+  cache.delete(matchId);
+}
+
 // Given the most recent ball (or null) plus the innings' chosen openers,
 // work out who's on strike / bowling right now and what the admin still
 // needs to supply before the next ball can be recorded.
@@ -77,6 +90,15 @@ const publicPlayerSelect = {
 };
 
 export async function getMatchState(matchId) {
+  const cached = cache.get(matchId);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.state;
+
+  const state = await computeMatchState(matchId);
+  if (state) cache.set(matchId, { state, at: Date.now() });
+  return state;
+}
+
+async function computeMatchState(matchId) {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
@@ -93,12 +115,22 @@ export async function getMatchState(matchId) {
 
   const allPlayers = [...match.teamA.players, ...match.teamB.players];
 
+  // One query for every innings' balls instead of one round-trip per innings.
+  const allBalls = match.innings.length
+    ? await prisma.ball.findMany({
+        where: { inningsId: { in: match.innings.map((i) => i.id) } },
+        orderBy: { sequence: 'asc' },
+      })
+    : [];
+  const ballsByInnings = new Map();
+  for (const b of allBalls) {
+    if (!ballsByInnings.has(b.inningsId)) ballsByInnings.set(b.inningsId, []);
+    ballsByInnings.get(b.inningsId).push(b);
+  }
+
   const inningsData = [];
   for (const inn of match.innings) {
-    const balls = await prisma.ball.findMany({
-      where: { inningsId: inn.id },
-      orderBy: { sequence: 'asc' },
-    });
+    const balls = ballsByInnings.get(inn.id) || [];
     const legalBallsSoFar = [];
     let legalCount = 0;
     for (const b of balls) {
