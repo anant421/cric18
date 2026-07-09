@@ -4,6 +4,7 @@ import { requireAdmin } from '../auth.js';
 import { getMatchState } from '../matchState.js';
 import { emitMatchUpdate } from '../sockets.js';
 import { asyncHandler } from '../asyncHandler.js';
+import { computeAwardPoints } from '../scoring.js';
 
 const router = Router();
 
@@ -211,7 +212,7 @@ router.post('/:id/undo', requireAdmin, asyncHandler(async (req, res) => {
   if (!last) return res.status(400).json({ error: 'No balls to undo' });
   await prisma.ball.delete({ where: { id: last.id } });
   await prisma.innings.update({ where: { id: inningsId }, data: { isCompleted: false } });
-  await prisma.match.updateMany({ where: { id: req.params.id, status: 'COMPLETED' }, data: { status: 'LIVE', winnerTeamId: null, resultText: null } });
+  await prisma.match.updateMany({ where: { id: req.params.id, status: 'COMPLETED' }, data: { status: 'LIVE', winnerTeamId: null, resultText: null, manOfMatchId: null } });
   await sendState(res, req.params.id);
 }));
 
@@ -242,9 +243,17 @@ async function maybeFinishInningsOrMatch(matchId, inningsId) {
       resultText = `${teamName} won by ${margin} run${margin === 1 ? '' : 's'}`;
     }
 
+    const allPlayers = [...match.teamA.players, ...match.teamB.players];
+    const allBalls = await prisma.ball.findMany({
+      where: { innings: { matchId } },
+      orderBy: { sequence: 'asc' },
+    });
+    const awards = computeAwardPoints(allBalls, allPlayers);
+    const manOfMatchId = awards[0]?.playerId || null;
+
     await prisma.match.update({
       where: { id: matchId },
-      data: { status: 'COMPLETED', winnerTeamId, resultText },
+      data: { status: 'COMPLETED', winnerTeamId, resultText, manOfMatchId },
     });
   }
 }

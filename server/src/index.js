@@ -9,6 +9,7 @@ import tournamentRoutes from './routes/tournaments.routes.js';
 import teamRoutes from './routes/teams.routes.js';
 import playerRoutes from './routes/players.routes.js';
 import matchRoutes from './routes/matches.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
 
 const app = express();
 // Supports a comma-separated list so both a production frontend and local
@@ -27,6 +28,7 @@ app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/matches', matchRoutes);
+app.use('/api/upload', uploadRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -35,6 +37,9 @@ app.use((err, req, res, next) => {
   }
   if (err?.code === 'P2003' || err?.code === '23503' || err?.code === '23001') {
     return res.status(409).json({ error: 'This action conflicts with related data and cannot be completed' });
+  }
+  if (err?.name === 'MulterError' || /image/i.test(err?.message || '')) {
+    return res.status(400).json({ error: err.message });
   }
   res.status(500).json({ error: 'Internal server error' });
 });

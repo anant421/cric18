@@ -220,3 +220,63 @@ export function shouldRotateStrike(type, runsBat, extraRuns) {
   if (type === 'WIDE') return Math.max(extraRuns - 1, 0) % 2 === 1;
   return false;
 }
+
+// Man of the Match / Man of the Tournament point formula. Fully deterministic
+// from ball data, so both awards are calculated rather than picked - the
+// breakdown is returned too so the UI can show why someone won it, not just
+// the final number.
+const AWARD_POINTS = {
+  perRun: 1,
+  four: 1,
+  six: 2,
+  wicket: 25,
+  catch: 10,
+  runOut: 10,
+  stumping: 10,
+  maidenOver: 8,
+};
+
+export function computeAwardPoints(balls, players) {
+  const nameMap = new Map(players.map((p) => [p.id, p]));
+  const pts = new Map();
+  const ensure = (id) => {
+    if (!pts.has(id)) {
+      pts.set(id, { playerId: id, name: nameMap.get(id)?.name || '?', battingPoints: 0, bowlingPoints: 0, fieldingPoints: 0 });
+    }
+    return pts.get(id);
+  };
+
+  for (const b of balls) {
+    if (b.extraType === 'NONE' || b.extraType === 'NOBALL') {
+      const p = ensure(b.strikerId);
+      p.battingPoints += b.runsBat * AWARD_POINTS.perRun;
+      if (b.runsBat === 4) p.battingPoints += AWARD_POINTS.four;
+      if (b.runsBat === 6) p.battingPoints += AWARD_POINTS.six;
+    }
+    if (b.isWicket) {
+      if (b.wicketType !== 'RUNOUT') {
+        ensure(b.bowlerId).bowlingPoints += AWARD_POINTS.wicket;
+      }
+      if (b.fielderId) {
+        const fieldingAward =
+          b.wicketType === 'CAUGHT' ? AWARD_POINTS.catch : b.wicketType === 'RUNOUT' ? AWARD_POINTS.runOut : b.wicketType === 'STUMPED' ? AWARD_POINTS.stumping : 0;
+        if (fieldingAward) ensure(b.fielderId).fieldingPoints += fieldingAward;
+      }
+    }
+  }
+
+  const overRunsByBowler = new Map();
+  for (const b of balls) {
+    if (!overRunsByBowler.has(b.bowlerId)) overRunsByBowler.set(b.bowlerId, new Map());
+    const overs = overRunsByBowler.get(b.bowlerId);
+    overs.set(b.overNumber, (overs.get(b.overNumber) || 0) + b.runsBat + b.extraRuns);
+  }
+  for (const [bowlerId, overs] of overRunsByBowler) {
+    const maidens = [...overs.values()].filter((r) => r === 0).length;
+    if (maidens > 0) ensure(bowlerId).bowlingPoints += maidens * AWARD_POINTS.maidenOver;
+  }
+
+  return [...pts.values()]
+    .map((p) => ({ ...p, totalPoints: p.battingPoints + p.bowlingPoints + p.fieldingPoints }))
+    .sort((a, b) => b.totalPoints - a.totalPoints);
+}

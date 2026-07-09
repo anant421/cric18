@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -7,6 +7,7 @@ const ROLES = ['BATSMAN', 'BOWLER', 'ALLROUNDER', 'WICKETKEEPER'];
 
 export default function AdminDashboard() {
   const { token } = useAuth();
+  const { id } = useParams();
   const navigate = useNavigate();
   const [tournament, setTournament] = useState(null);
   const [tab, setTab] = useState('Teams');
@@ -14,25 +15,23 @@ export default function AdminDashboard() {
 
   const refresh = () =>
     api
-      .get('/tournaments/cpl')
+      .get(`/tournaments/${id}`)
       .then(setTournament)
-      .catch((e) => {
-        if (e.message === 'not_initialized') {
-          return api.post('/tournaments/cpl/init', {}, token).then(setTournament);
-        }
-        setError(e.message);
-      });
+      .catch((e) => setError(e.message));
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [id]);
 
   if (error) return <p className="mx-auto max-w-4xl px-4 py-8 text-red-600">{error}</p>;
   if (!tournament) return <p className="mx-auto max-w-4xl px-4 py-8 text-slate-400">Loading…</p>;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-extrabold">{tournament.name}</h1>
+      <Link to="/" className="mb-3 inline-block text-sm text-slate-500 hover:text-navy">
+        &larr; All Tournaments
+      </Link>
+      <TournamentNameEditor tournament={tournament} token={token} onChange={refresh} />
 
       <div className="mb-6 flex gap-1 border-b border-border">
         {['Teams', 'Matches'].map((t) => (
@@ -48,6 +47,55 @@ export default function AdminDashboard() {
 
       {tab === 'Teams' && <TeamsTab tournament={tournament} token={token} onChange={refresh} />}
       {tab === 'Matches' && <MatchesTab tournament={tournament} token={token} onChange={refresh} navigate={navigate} />}
+    </div>
+  );
+}
+
+function TournamentNameEditor({ tournament, token, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(tournament.name);
+  const [error, setError] = useState('');
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setError('');
+    try {
+      await api.patch(`/tournaments/${tournament.id}`, { name: name.trim() }, token);
+      setEditing(false);
+      onChange();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  if (editing) {
+    return (
+      <form onSubmit={save} className="mb-6 flex flex-wrap items-center gap-2">
+        <input className="input max-w-sm text-2xl font-extrabold" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <button className="btn-primary">Save</button>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => {
+            setEditing(false);
+            setName(tournament.name);
+            setError('');
+          }}
+        >
+          Cancel
+        </button>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </form>
+    );
+  }
+
+  return (
+    <div className="mb-6 flex items-center gap-2">
+      <h1 className="text-2xl font-extrabold">{tournament.name}</h1>
+      <button className="text-xs text-slate-400 hover:text-navy hover:underline" onClick={() => setEditing(true)}>
+        Rename
+      </button>
     </div>
   );
 }
@@ -109,15 +157,22 @@ function TeamsTab({ tournament, token, onChange }) {
 
 function TeamCard({ team, tournamentId, token, onChange, onRemove }) {
   const [playerName, setPlayerName] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [role, setRole] = useState('BATSMAN');
   const [error, setError] = useState('');
 
   const addPlayer = async (e) => {
     e.preventDefault();
-    if (!playerName) return;
-    await api.post('/players', { tournamentId, teamId: team.id, name: playerName, role }, token);
-    setPlayerName('');
-    onChange();
+    if (!playerName || !mobileNumber) return;
+    setError('');
+    try {
+      await api.post('/players', { tournamentId, teamId: team.id, name: playerName, mobileNumber, role }, token);
+      setPlayerName('');
+      setMobileNumber('');
+      onChange();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const removePlayer = async (playerId) => {
@@ -159,12 +214,18 @@ function TeamCard({ team, tournamentId, token, onChange, onRemove }) {
       </ul>
       {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
 
-      <form onSubmit={addPlayer} className="flex gap-2">
+      <form onSubmit={addPlayer} className="flex flex-wrap gap-2">
         <input
           className="input"
           placeholder="Player name"
           value={playerName}
           onChange={(e) => setPlayerName(e.target.value)}
+        />
+        <input
+          className="input"
+          placeholder="Mobile number"
+          value={mobileNumber}
+          onChange={(e) => setMobileNumber(e.target.value)}
         />
         <select className="input w-auto" value={role} onChange={(e) => setRole(e.target.value)}>
           {ROLES.map((r) => (
@@ -173,7 +234,9 @@ function TeamCard({ team, tournamentId, token, onChange, onRemove }) {
             </option>
           ))}
         </select>
-        <button className="btn-secondary shrink-0">Add</button>
+        <button className="btn-secondary shrink-0" disabled={!playerName || !mobileNumber}>
+          Add
+        </button>
       </form>
     </div>
   );
@@ -185,6 +248,8 @@ function MatchesTab({ tournament, token, onChange, navigate }) {
   const [oversLimit, setOversLimit] = useState(8);
   const [venue, setVenue] = useState('');
   const [error, setError] = useState('');
+  const [fixtureError, setFixtureError] = useState('');
+  const [busy, setBusy] = useState('');
 
   const addMatch = async (e) => {
     e.preventDefault();
@@ -210,8 +275,66 @@ function MatchesTab({ tournament, token, onChange, navigate }) {
     onChange();
   };
 
+  const leagueMatches = tournament.matches.filter((m) => m.stage === 'LEAGUE');
+  const finalMatch = tournament.matches.find((m) => m.stage === 'FINAL');
+  const leagueAllCompleted = leagueMatches.length > 0 && leagueMatches.every((m) => m.status === 'COMPLETED');
+
+  const generateFixtures = async () => {
+    setFixtureError('');
+    setBusy('fixtures');
+    try {
+      await api.post(`/tournaments/${tournament.id}/generate-fixtures`, { oversLimit: Number(oversLimit) }, token);
+      onChange();
+    } catch (err) {
+      setFixtureError(err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const generateFinal = async () => {
+    setFixtureError('');
+    setBusy('final');
+    try {
+      await api.post(`/tournaments/${tournament.id}/generate-final`, { oversLimit: Number(oversLimit) }, token);
+      onChange();
+    } catch (err) {
+      setFixtureError(err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <div className="card flex flex-wrap items-center gap-3 p-4">
+        <div>
+          <p className="font-semibold">League + Playoff Fixtures</p>
+          <p className="text-xs text-slate-500">
+            Generates a round-robin league (every team plays every other team once), then a Final between the top 2 teams on the points table.
+          </p>
+        </div>
+        <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={busy !== '' || leagueMatches.length > 0 || tournament.teams.length < 2}
+            onClick={generateFixtures}
+          >
+            {busy === 'fixtures' ? 'Generating…' : 'Generate League Fixtures'}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={busy !== '' || !leagueAllCompleted || !!finalMatch}
+            onClick={generateFinal}
+          >
+            {busy === 'final' ? 'Setting up…' : 'Set Up Final'}
+          </button>
+        </div>
+      </div>
+      {fixtureError && <p className="text-sm text-red-600">{fixtureError}</p>}
+
       <form onSubmit={addMatch} className="card flex flex-wrap items-end gap-3 p-4">
         <div className="min-w-[160px]">
           <label className="label">Team A</label>
@@ -257,6 +380,7 @@ function MatchesTab({ tournament, token, onChange, navigate }) {
           <div key={m.id} className="card flex flex-wrap items-center justify-between gap-3 p-4">
             <div>
               <p className="font-semibold">
+                {m.stage === 'FINAL' && <span className="mr-2 rounded bg-brand px-1.5 py-0.5 text-xs font-bold text-navy">FINAL</span>}
                 {m.teamA.name} vs {m.teamB.name}
               </p>
               <p className="text-xs text-slate-400">

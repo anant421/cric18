@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { requireAdmin } from '../auth.js';
 import { asyncHandler } from '../asyncHandler.js';
+import { computeAwardPoints } from '../scoring.js';
 
 const router = Router();
 
@@ -13,36 +14,28 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json(tournaments);
 }));
 
+// Never select mobileNumber here - these fields get echoed straight back in
+// the public tournament-detail response. Phone numbers only ever need to be
+// read server-side, for the registration duplicate check.
+const publicPlayerSelect = {
+  id: true,
+  tournamentId: true,
+  teamId: true,
+  name: true,
+  role: true,
+  battingStyle: true,
+  bowlingStyle: true,
+  photoUrl: true,
+  createdAt: true,
+};
+
 const tournamentDetailInclude = {
-  teams: { include: { players: true } },
+  teams: { include: { players: { select: publicPlayerSelect } } },
   matches: {
-    include: { teamA: true, teamB: true, winnerTeam: true },
+    include: { teamA: true, teamB: true, winnerTeam: true, manOfMatch: { select: publicPlayerSelect } },
     orderBy: { scheduledAt: 'asc' },
   },
 };
-
-// This app is dedicated to a single tournament (CData Premier League).
-// These two routes must be registered before the generic "/:id" route below,
-// otherwise Express would match "cpl" as an :id param instead.
-router.get('/cpl', asyncHandler(async (req, res) => {
-  const t = await prisma.tournament.findFirst({
-    orderBy: { createdAt: 'asc' },
-    include: tournamentDetailInclude,
-  });
-  if (!t) return res.status(404).json({ error: 'not_initialized' });
-  res.json(t);
-}));
-
-router.post('/cpl/init', requireAdmin, asyncHandler(async (req, res) => {
-  const existing = await prisma.tournament.findFirst({
-    orderBy: { createdAt: 'asc' },
-    include: tournamentDetailInclude,
-  });
-  if (existing) return res.json(existing);
-  const created = await prisma.tournament.create({ data: { name: 'CData Premier League' } });
-  const full = await prisma.tournament.findUnique({ where: { id: created.id }, include: tournamentDetailInclude });
-  res.status(201).json(full);
-}));
 
 router.get('/:id', asyncHandler(async (req, res) => {
   const t = await prisma.tournament.findUnique({
@@ -60,14 +53,23 @@ router.post('/', requireAdmin, asyncHandler(async (req, res) => {
   res.status(201).json(t);
 }));
 
+router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const { name, season } = req.body || {};
+  if (name != null && !name.trim()) return res.status(400).json({ error: 'name cannot be empty' });
+  const t = await prisma.tournament.update({
+    where: { id: req.params.id },
+    data: { name: name?.trim(), season },
+  });
+  res.json(t);
+}));
+
 router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   await prisma.tournament.delete({ where: { id: req.params.id } });
   res.status(204).end();
 }));
 
 // --- Points table (with Net Run Rate, per ICC convention) ---
-router.get('/:id/points-table', asyncHandler(async (req, res) => {
-  const tournamentId = req.params.id;
+async function computePointsTable(tournamentId) {
   const teams = await prisma.team.findMany({
     where: { tournamentId },
     include: { _count: { select: { players: true } } },
@@ -158,7 +160,7 @@ router.get('/:id/points-table', asyncHandler(async (req, res) => {
     }
   }
 
-  const rows = [...table.values()]
+  return [...table.values()]
     .map((r) => {
       const forRate = r.oversFor > 0 ? r.runsFor / r.oversFor : 0;
       const againstRate = r.oversAgainst > 0 ? r.runsAgainst / r.oversAgainst : 0;
@@ -176,7 +178,10 @@ router.get('/:id/points-table', asyncHandler(async (req, res) => {
       };
     })
     .sort((x, y) => y.points - x.points || y.nrr - x.nrr);
-  res.json(rows);
+}
+
+router.get('/:id/points-table', asyncHandler(async (req, res) => {
+  res.json(await computePointsTable(req.params.id));
 }));
 
 // --- Leaderboards ---
@@ -241,6 +246,94 @@ router.get('/:id/stats/leaderboards', asyncHandler(async (req, res) => {
     .sort((a, b) => b.wickets - a.wickets || a.runsConceded - b.runsConceded);
 
   res.json({ topBatting: battingList.slice(0, 20), topBowling: bowlingList.slice(0, 20) });
+}));
+
+// --- Awards: per-match Man of the Match + tournament-wide Man of the Tournament ---
+router.get('/:id/awards', asyncHandler(async (req, res) => {
+  const tournamentId = req.params.id;
+  const players = await prisma.player.findMany({ where: { tournamentId } });
+  const allMatches = await prisma.match.findMany({ where: { tournamentId } });
+  const completedMatches = await prisma.match.findMany({
+    where: { tournamentId, status: 'COMPLETED' },
+    include: { teamA: true, teamB: true, manOfMatch: true },
+    orderBy: { scheduledAt: 'asc' },
+  });
+  const balls = await prisma.ball.findMany({
+    where: { innings: { match: { tournamentId, status: 'COMPLETED' } } },
+  });
+
+  // Man of the Tournament is only crowned once the tournament has actually
+  // finished: the Final (if one was set up) is completed, or - for
+  // tournaments run without the auto-fixtures Final - every match is done.
+  const finalMatch = allMatches.find((m) => m.stage === 'FINAL');
+  const isComplete = finalMatch
+    ? finalMatch.status === 'COMPLETED'
+    : allMatches.length > 0 && allMatches.every((m) => m.status === 'COMPLETED' || m.status === 'ABANDONED');
+
+  const tournamentAwards = computeAwardPoints(balls, players);
+
+  res.json({
+    isComplete,
+    manOfTournament: isComplete ? tournamentAwards[0] || null : null,
+    contenders: tournamentAwards.slice(0, 10),
+    matchAwards: completedMatches.map((m) => ({
+      matchId: m.id,
+      teamA: m.teamA.name,
+      teamB: m.teamB.name,
+      resultText: m.resultText,
+      manOfMatchId: m.manOfMatchId,
+      manOfMatchName: m.manOfMatch?.name || null,
+    })),
+  });
+}));
+
+// --- Fixtures: round-robin league stage, then a Final between the top 2 ---
+router.post('/:id/generate-fixtures', requireAdmin, asyncHandler(async (req, res) => {
+  const tournamentId = req.params.id;
+  const existing = await prisma.match.findFirst({ where: { tournamentId, stage: 'LEAGUE' } });
+  if (existing) return res.status(400).json({ error: 'League fixtures have already been generated for this tournament' });
+
+  const teams = await prisma.team.findMany({ where: { tournamentId } });
+  if (teams.length < 2) return res.status(400).json({ error: 'Add at least two teams before generating fixtures' });
+
+  const { oversLimit = 8 } = req.body || {};
+  const pairs = [];
+  for (let i = 0; i < teams.length; i += 1) {
+    for (let j = i + 1; j < teams.length; j += 1) {
+      pairs.push([teams[i].id, teams[j].id]);
+    }
+  }
+
+  await prisma.match.createMany({
+    data: pairs.map(([teamAId, teamBId]) => ({ tournamentId, teamAId, teamBId, oversLimit, stage: 'LEAGUE' })),
+  });
+
+  const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, include: tournamentDetailInclude });
+  res.status(201).json(t);
+}));
+
+router.post('/:id/generate-final', requireAdmin, asyncHandler(async (req, res) => {
+  const tournamentId = req.params.id;
+  const existingFinal = await prisma.match.findFirst({ where: { tournamentId, stage: 'FINAL' } });
+  if (existingFinal) return res.status(400).json({ error: 'The Final has already been set up' });
+
+  const leagueMatches = await prisma.match.findMany({ where: { tournamentId, stage: 'LEAGUE' } });
+  if (leagueMatches.length === 0) return res.status(400).json({ error: 'Generate the league fixtures first' });
+  if (leagueMatches.some((m) => m.status !== 'COMPLETED')) {
+    return res.status(400).json({ error: 'All league matches must be completed before the Final can be set up' });
+  }
+
+  const table = await computePointsTable(tournamentId);
+  if (table.length < 2) return res.status(400).json({ error: 'Need at least two teams on the points table' });
+  const [first, second] = table;
+  const { oversLimit = 8 } = req.body || {};
+
+  await prisma.match.create({
+    data: { tournamentId, teamAId: first.teamId, teamBId: second.teamId, oversLimit, stage: 'FINAL' },
+  });
+
+  const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, include: tournamentDetailInclude });
+  res.status(201).json(t);
 }));
 
 export default router;

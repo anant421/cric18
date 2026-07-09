@@ -15,9 +15,12 @@ export default function MatchCard({ match }) {
       className="card block p-4 transition hover:border-brand/40 hover:shadow-cardHover"
     >
       <div className="mb-3 flex items-center justify-between">
-        <span className={`pill ${statusPill[match.status] || statusPill.SCHEDULED}`}>
-          {match.status === 'LIVE' && <span className="live-dot" />}
-          {match.status}
+        <span className="flex items-center gap-1.5">
+          <span className={`pill ${statusPill[match.status] || statusPill.SCHEDULED}`}>
+            {match.status === 'LIVE' && <span className="live-dot" />}
+            {match.status}
+          </span>
+          {match.stage === 'FINAL' && <span className="pill bg-brand text-navy">FINAL</span>}
         </span>
         {match.venue && <span className="text-xs text-slate-400">{match.venue}</span>}
       </div>
@@ -26,6 +29,11 @@ export default function MatchCard({ match }) {
         <TeamRow team={match.teamB} isWinner={match.winnerTeamId === match.teamBId} score={match.scoreB} />
       </div>
       {match.resultText && <p className="mt-3 text-sm font-medium text-gold">{match.resultText}</p>}
+      {match.manOfMatch?.name && (
+        <p className="mt-1 text-xs text-slate-500">
+          🏆 Man of the Match: <span className="font-semibold text-navy">{match.manOfMatch.name}</span>
+        </p>
+      )}
       {!match.resultText && match.scheduledAt && (
         <p className="mt-3 text-xs text-slate-400">{new Date(match.scheduledAt).toLocaleString()}</p>
       )}

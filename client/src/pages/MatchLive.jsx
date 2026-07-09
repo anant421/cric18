@@ -36,19 +36,27 @@ export default function MatchLive() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <Link to="/" className="text-sm text-slate-500 hover:text-navy">
+      <Link to={`/tournaments/${match.tournamentId}`} className="text-sm text-slate-500 hover:text-navy">
         &larr; {match.tournamentName}
       </Link>
 
       <div className="mt-3 mb-5 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold">
+        <h1 className="flex items-center gap-2 text-xl font-bold">
+          {match.stage === 'FINAL' && <span className="rounded bg-brand px-1.5 py-0.5 text-xs font-bold text-navy">FINAL</span>}
           {match.teamA.shortName} vs {match.teamB.shortName}
         </h1>
         {match.venue && <span className="text-sm text-slate-400">{match.venue}</span>}
       </div>
 
       {match.resultText && (
-        <div className="card mb-5 p-4 text-center font-semibold text-gold">{match.resultText}</div>
+        <div className="card mb-5 p-4 text-center">
+          <p className="font-semibold text-gold">{match.resultText}</p>
+          {match.manOfMatchName && (
+            <p className="mt-1 text-sm text-slate-500">
+              🏆 Man of the Match: <span className="font-semibold text-navy">{match.manOfMatchName}</span>
+            </p>
+          )}
+        </div>
       )}
 
       {match.tossWinnerTeamId && (

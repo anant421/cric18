@@ -15,7 +15,7 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       await login(password);
-      navigate('/admin');
+      navigate('/');
     } catch (err) {
       setError(err.message);
     } finally {

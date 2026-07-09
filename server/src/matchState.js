@@ -61,15 +61,31 @@ function deriveLiveState(innings, lastBall) {
   };
 }
 
+// Never select mobileNumber here - these fields get echoed straight back in
+// public API responses (match state, tournament detail), and phone numbers
+// are only ever needed server-side for the registration duplicate check.
+const publicPlayerSelect = {
+  id: true,
+  tournamentId: true,
+  teamId: true,
+  name: true,
+  role: true,
+  battingStyle: true,
+  bowlingStyle: true,
+  photoUrl: true,
+  createdAt: true,
+};
+
 export async function getMatchState(matchId) {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
-      teamA: { include: { players: true } },
-      teamB: { include: { players: true } },
+      teamA: { include: { players: { select: publicPlayerSelect } } },
+      teamB: { include: { players: { select: publicPlayerSelect } } },
       tournament: true,
       winnerTeam: true,
       tossWinnerTeam: true,
+      manOfMatch: true,
       innings: { orderBy: { inningsNumber: 'asc' } },
     },
   });
@@ -135,9 +151,12 @@ export async function getMatchState(matchId) {
     tournamentId: match.tournamentId,
     tournamentName: match.tournament.name,
     status: match.status,
+    stage: match.stage,
     venue: match.venue,
     scheduledAt: match.scheduledAt,
     oversLimit: match.oversLimit,
+    manOfMatchId: match.manOfMatchId,
+    manOfMatchName: match.manOfMatch?.name || null,
     teamA: { id: match.teamA.id, name: match.teamA.name, shortName: match.teamA.shortName, colorHex: match.teamA.colorHex, players: match.teamA.players },
     teamB: { id: match.teamB.id, name: match.teamB.name, shortName: match.teamB.shortName, colorHex: match.teamB.colorHex, players: match.teamB.players },
     tossWinnerTeamId: match.tossWinnerTeamId,

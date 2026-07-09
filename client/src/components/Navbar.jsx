@@ -1,10 +1,16 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Navbar() {
   const { isAdmin, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Only show Register while actually viewing a specific tournament (e.g.
+  // /tournaments/:id or /admin/tournaments/:id) - on the hub or any other
+  // page there's no single tournament to register into.
+  const viewedTournamentId = location.pathname.match(/\/tournaments\/([^/]+)/)?.[1];
 
   const ghostBtn =
     'inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/20 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 active:scale-95';
@@ -16,11 +22,13 @@ export default function Navbar() {
           <img src="/cdata-logo.svg" alt="CDATA" className="h-6" />
         </Link>
         <div className="flex items-center gap-2">
+          {viewedTournamentId && (
+            <Link to={`/tournaments/${viewedTournamentId}/register`} className={ghostBtn}>
+              Register as a Player
+            </Link>
+          )}
           {isAdmin ? (
             <>
-              <Link to="/admin" className={ghostBtn}>
-                Admin
-              </Link>
               <button
                 className={ghostBtn}
                 onClick={() => {

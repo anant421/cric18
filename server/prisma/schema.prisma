@@ -10,6 +10,7 @@
 //   TossDecision: BAT | BOWL
 //   ExtraType:    NONE | WIDE | NOBALL | BYE | LEGBYE
 //   WicketType:   BOWLED | CAUGHT | LBW | RUNOUT | STUMPED | HITWICKET | RETIRED
+//   MatchStage:   LEAGUE | FINAL
 
 generator client {
   provider = "prisma-client-js"
@@ -57,13 +58,18 @@ model Player {
   role         String     @default("BATSMAN")
   battingStyle String?
   bowlingStyle String?
+  photoUrl     String?
+  // Globally unique so the same person can't register twice across any
+  // tournament - the app-layer duplicate check relies on this constraint.
+  mobileNumber String?    @unique
   createdAt    DateTime   @default(now())
 
-  ballsAsStriker    Ball[] @relation("Striker")
-  ballsAsNonStriker Ball[] @relation("NonStriker")
-  ballsAsBowler     Ball[] @relation("Bowler")
-  ballsAsDismissed  Ball[] @relation("Dismissed")
-  ballsAsFielder    Ball[] @relation("Fielder")
+  ballsAsStriker    Ball[]  @relation("Striker")
+  ballsAsNonStriker Ball[]  @relation("NonStriker")
+  ballsAsBowler     Ball[]  @relation("Bowler")
+  ballsAsDismissed  Ball[]  @relation("Dismissed")
+  ballsAsFielder    Ball[]  @relation("Fielder")
+  manOfMatchAwards  Match[] @relation("ManOfMatch")
 }
 
 model Match {
@@ -78,6 +84,10 @@ model Match {
   venue        String?
   scheduledAt  DateTime?
   status       String     @default("SCHEDULED")
+  stage        String     @default("LEAGUE")
+
+  manOfMatchId String?
+  manOfMatch   Player? @relation("ManOfMatch", fields: [manOfMatchId], references: [id], onDelete: SetNull)
 
   tossWinnerTeamId String?
   tossWinnerTeam    Team?   @relation("TossWinner", fields: [tossWinnerTeamId], references: [id], onDelete: Cascade)

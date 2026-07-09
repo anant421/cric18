@@ -3,6 +3,8 @@ import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Home from './pages/Home.jsx';
+import TournamentDetail from './pages/TournamentDetail.jsx';
+import Register from './pages/Register.jsx';
 import MatchLive from './pages/MatchLive.jsx';
 import AdminLogin from './pages/AdminLogin.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
@@ -14,10 +16,12 @@ export default function App() {
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/tournaments/:id" element={<TournamentDetail />} />
+        <Route path="/tournaments/:tournamentId/register" element={<Register />} />
         <Route path="/matches/:id" element={<MatchLive />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route
-          path="/admin"
+          path="/admin/tournaments/:id"
           element={
             <ProtectedRoute>
               <AdminDashboard />
