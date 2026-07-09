@@ -37,11 +37,30 @@ const tournamentDetailInclude = {
   },
 };
 
+// Every viewer on the tournament page hits this route, and it's expensive
+// (nested teams/players/matches). Unlike ball-by-ball match state, roster
+// and match-list changes aren't second-by-second critical, so a short TTL
+// is enough to absorb concurrent reads without needing exact invalidation
+// wired through every route (teams/players/matches) that can touch this data.
+const DETAIL_TTL_MS = 5000;
+const detailCache = new Map();
+
+export function invalidateTournamentDetail(tournamentId) {
+  detailCache.delete(tournamentId);
+}
+
 router.get('/:id', asyncHandler(async (req, res) => {
+  const cached = detailCache.get(req.params.id);
+  if (cached && Date.now() - cached.at < DETAIL_TTL_MS) {
+    if (!cached.state) return res.status(404).json({ error: 'Tournament not found' });
+    return res.json(cached.state);
+  }
+
   const t = await prisma.tournament.findUnique({
     where: { id: req.params.id },
     include: tournamentDetailInclude,
   });
+  detailCache.set(req.params.id, { state: t, at: Date.now() });
   if (!t) return res.status(404).json({ error: 'Tournament not found' });
   res.json(t);
 }));
@@ -60,11 +79,13 @@ router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
     where: { id: req.params.id },
     data: { name: name?.trim(), season },
   });
+  invalidateTournamentDetail(req.params.id);
   res.json(t);
 }));
 
 router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   await prisma.tournament.delete({ where: { id: req.params.id } });
+  invalidateTournamentDetail(req.params.id);
   res.status(204).end();
 }));
 
@@ -309,6 +330,7 @@ router.post('/:id/generate-fixtures', requireAdmin, asyncHandler(async (req, res
   });
 
   const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, include: tournamentDetailInclude });
+  invalidateTournamentDetail(tournamentId);
   res.status(201).json(t);
 }));
 
@@ -333,6 +355,7 @@ router.post('/:id/generate-final', requireAdmin, asyncHandler(async (req, res) =
   });
 
   const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, include: tournamentDetailInclude });
+  invalidateTournamentDetail(tournamentId);
   res.status(201).json(t);
 }));
 

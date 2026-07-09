@@ -5,6 +5,7 @@ import { getMatchState, invalidateMatchState } from '../matchState.js';
 import { emitMatchUpdate } from '../sockets.js';
 import { asyncHandler } from '../asyncHandler.js';
 import { computeAwardPoints } from '../scoring.js';
+import { invalidateTournamentDetail } from './tournaments.routes.js';
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.post('/', requireAdmin, asyncHandler(async (req, res) => {
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
     },
   });
+  invalidateTournamentDetail(tournamentId);
   res.status(201).json(match);
 }));
 
@@ -51,12 +53,14 @@ router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
     },
   });
   invalidateMatchState(req.params.id);
+  invalidateTournamentDetail(match.tournamentId);
   res.json(match);
 }));
 
 router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
-  await prisma.match.delete({ where: { id: req.params.id } });
+  const match = await prisma.match.delete({ where: { id: req.params.id } });
   invalidateMatchState(req.params.id);
+  invalidateTournamentDetail(match.tournamentId);
   res.status(204).end();
 }));
 
@@ -86,6 +90,7 @@ router.post('/:id/toss', requireAdmin, asyncHandler(async (req, res) => {
   ]);
 
   invalidateMatchState(match.id);
+  invalidateTournamentDetail(match.tournamentId);
   await sendState(res, match.id);
 }));
 
@@ -218,7 +223,11 @@ router.post('/:id/undo', requireAdmin, asyncHandler(async (req, res) => {
   if (!last) return res.status(400).json({ error: 'No balls to undo' });
   await prisma.ball.delete({ where: { id: last.id } });
   await prisma.innings.update({ where: { id: inningsId }, data: { isCompleted: false } });
-  await prisma.match.updateMany({ where: { id: req.params.id, status: 'COMPLETED' }, data: { status: 'LIVE', winnerTeamId: null, resultText: null, manOfMatchId: null } });
+  const { count } = await prisma.match.updateMany({ where: { id: req.params.id, status: 'COMPLETED' }, data: { status: 'LIVE', winnerTeamId: null, resultText: null, manOfMatchId: null } });
+  if (count > 0) {
+    const match = await prisma.match.findUnique({ where: { id: req.params.id }, select: { tournamentId: true } });
+    invalidateTournamentDetail(match.tournamentId);
+  }
   invalidateMatchState(req.params.id);
   await sendState(res, req.params.id);
 }));
@@ -264,6 +273,7 @@ async function maybeFinishInningsOrMatch(matchId, inningsId) {
       data: { status: 'COMPLETED', winnerTeamId, resultText, manOfMatchId },
     });
     invalidateMatchState(matchId);
+    invalidateTournamentDetail(match.tournamentId);
   }
 }
 

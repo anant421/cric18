@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { requireAdmin } from '../auth.js';
 import { asyncHandler } from '../asyncHandler.js';
+import { invalidateTournamentDetail } from './tournaments.routes.js';
 
 const router = Router();
 
@@ -39,6 +40,7 @@ router.post('/', asyncHandler(async (req, res) => {
   const player = await prisma.player.create({
     data: { tournamentId, teamId, name, role: role || 'BATSMAN', battingStyle, bowlingStyle, photoUrl, mobileNumber: normalized },
   });
+  invalidateTournamentDetail(tournamentId);
   res.status(201).json(player);
 }));
 
@@ -59,6 +61,7 @@ router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
     where: { id: req.params.id },
     data: { name, role, battingStyle, bowlingStyle, photoUrl, mobileNumber: normalized },
   });
+  invalidateTournamentDetail(player.tournamentId);
   res.json(player);
 }));
 
@@ -80,7 +83,8 @@ router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
       error: 'This player has already been scored in a match and can’t be removed. Delete the match first if you need to remove them.',
     });
   }
-  await prisma.player.delete({ where: { id: req.params.id } });
+  const player = await prisma.player.delete({ where: { id: req.params.id } });
+  invalidateTournamentDetail(player.tournamentId);
   res.status(204).end();
 }));
 

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { requireAdmin } from '../auth.js';
 import { asyncHandler } from '../asyncHandler.js';
+import { invalidateTournamentDetail } from './tournaments.routes.js';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.post('/', requireAdmin, asyncHandler(async (req, res) => {
   const team = await prisma.team.create({
     data: { tournamentId, name, shortName, colorHex: colorHex || '#1d9bf0' },
   });
+  invalidateTournamentDetail(tournamentId);
   res.status(201).json(team);
 }));
 
@@ -22,6 +24,7 @@ router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
     where: { id: req.params.id },
     data: { name, shortName, colorHex },
   });
+  invalidateTournamentDetail(team.tournamentId);
   res.json(team);
 }));
 
@@ -35,7 +38,8 @@ router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
       error: 'This team has scheduled or played matches and can’t be removed. Delete those matches first if you need to remove the team.',
     });
   }
-  await prisma.team.delete({ where: { id: req.params.id } });
+  const team = await prisma.team.delete({ where: { id: req.params.id } });
+  invalidateTournamentDetail(team.tournamentId);
   res.status(204).end();
 }));
 
