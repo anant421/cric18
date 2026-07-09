@@ -44,23 +44,35 @@ const tournamentDetailInclude = {
 // wired through every route (teams/players/matches) that can touch this data.
 const DETAIL_TTL_MS = 5000;
 const detailCache = new Map();
+// Coalesces concurrent cache-misses onto one in-flight query instead of
+// letting every simultaneous viewer trigger their own redundant fetch.
+const detailInFlight = new Map();
 
 export function invalidateTournamentDetail(tournamentId) {
   detailCache.delete(tournamentId);
 }
 
 router.get('/:id', asyncHandler(async (req, res) => {
-  const cached = detailCache.get(req.params.id);
+  const id = req.params.id;
+  const cached = detailCache.get(id);
   if (cached && Date.now() - cached.at < DETAIL_TTL_MS) {
     if (!cached.state) return res.status(404).json({ error: 'Tournament not found' });
     return res.json(cached.state);
   }
 
-  const t = await prisma.tournament.findUnique({
-    where: { id: req.params.id },
-    include: tournamentDetailInclude,
-  });
-  detailCache.set(req.params.id, { state: t, at: Date.now() });
+  let promise = detailInFlight.get(id);
+  if (!promise) {
+    promise = prisma.tournament
+      .findUnique({ where: { id }, include: tournamentDetailInclude })
+      .then((t) => {
+        detailCache.set(id, { state: t, at: Date.now() });
+        return t;
+      })
+      .finally(() => detailInFlight.delete(id));
+    detailInFlight.set(id, promise);
+  }
+
+  const t = await promise;
   if (!t) return res.status(404).json({ error: 'Tournament not found' });
   res.json(t);
 }));

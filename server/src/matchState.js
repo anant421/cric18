@@ -89,13 +89,26 @@ const publicPlayerSelect = {
   createdAt: true,
 };
 
+// If many viewers request the same never-yet-cached (or just-invalidated)
+// match at once, only the first should actually hit the database - the rest
+// wait on that same in-flight computation instead of each triggering their
+// own redundant one (a "cache stampede").
+const inFlight = new Map();
+
 export async function getMatchState(matchId) {
   const cached = cache.get(matchId);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.state;
 
-  const state = await computeMatchState(matchId);
-  if (state) cache.set(matchId, { state, at: Date.now() });
-  return state;
+  if (inFlight.has(matchId)) return inFlight.get(matchId);
+
+  const promise = computeMatchState(matchId)
+    .then((state) => {
+      if (state) cache.set(matchId, { state, at: Date.now() });
+      return state;
+    })
+    .finally(() => inFlight.delete(matchId));
+  inFlight.set(matchId, promise);
+  return promise;
 }
 
 async function computeMatchState(matchId) {
