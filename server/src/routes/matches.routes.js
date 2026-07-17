@@ -66,7 +66,7 @@ router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
 
 // --- Toss: decides who bats first and opens innings 1 ---
 router.post('/:id/toss', requireAdmin, asyncHandler(async (req, res) => {
-  const { tossWinnerTeamId, tossDecision } = req.body || {};
+  const { tossWinnerTeamId, tossDecision, umpire1, umpire2 } = req.body || {};
   const match = await prisma.match.findUnique({ where: { id: req.params.id } });
   if (!match) return res.status(404).json({ error: 'Match not found' });
   if (![match.teamAId, match.teamBId].includes(tossWinnerTeamId)) {
@@ -82,7 +82,7 @@ router.post('/:id/toss', requireAdmin, asyncHandler(async (req, res) => {
   await prisma.$transaction([
     prisma.match.update({
       where: { id: match.id },
-      data: { tossWinnerTeamId, tossDecision, status: 'LIVE', currentInningsNumber: 1 },
+      data: { tossWinnerTeamId, tossDecision, status: 'LIVE', currentInningsNumber: 1, umpire1: umpire1 || null, umpire2: umpire2 || null },
     }),
     prisma.innings.create({
       data: { matchId: match.id, inningsNumber: 1, battingTeamId, bowlingTeamId },
@@ -152,6 +152,7 @@ router.post('/:id/ball', requireAdmin, asyncHandler(async (req, res) => {
     wicketType,
     dismissedId,
     fielderId,
+    isOverthrow = false,
   } = req.body || {};
 
   if (!inningsId || !strikerId || !nonStrikerId || !bowlerId || !type) {
@@ -207,6 +208,7 @@ router.post('/:id/ball', requireAdmin, asyncHandler(async (req, res) => {
       wicketType: isWicket ? wicketType : null,
       dismissedId: isWicket ? dismissedId || strikerId : null,
       fielderId: isWicket ? fielderId || null : null,
+      isOverthrow: type === 'RUN' && isOverthrow,
     },
   });
 

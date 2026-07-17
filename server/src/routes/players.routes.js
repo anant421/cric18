@@ -25,9 +25,12 @@ function isValidMobile(normalized) {
 // SMS/OTP verification, so it doesn't confirm the registrant actually owns
 // the number.
 router.post('/', asyncHandler(async (req, res) => {
-  const { tournamentId, teamId, name, role, battingStyle, bowlingStyle, photoUrl, mobileNumber } = req.body || {};
-  if (!tournamentId || !teamId || !name || !mobileNumber) {
-    return res.status(400).json({ error: 'tournamentId, teamId, name and mobileNumber are required' });
+  const { tournamentId, teamId, name, role, gender, battingStyle, bowlingStyle, photoUrl, mobileNumber } = req.body || {};
+  if (!tournamentId || !teamId || !name || !mobileNumber || !gender) {
+    return res.status(400).json({ error: 'tournamentId, teamId, name, gender and mobileNumber are required' });
+  }
+  if (!['MALE', 'FEMALE'].includes(gender)) {
+    return res.status(400).json({ error: 'gender must be MALE or FEMALE' });
   }
   const normalized = normalizeMobile(mobileNumber);
   if (!isValidMobile(normalized)) {
@@ -38,14 +41,17 @@ router.post('/', asyncHandler(async (req, res) => {
     return res.status(409).json({ error: 'This mobile number is already registered. Each player can only register once.' });
   }
   const player = await prisma.player.create({
-    data: { tournamentId, teamId, name, role: role || 'BATSMAN', battingStyle, bowlingStyle, photoUrl, mobileNumber: normalized },
+    data: { tournamentId, teamId, name, role: role || 'BATSMAN', gender, battingStyle, bowlingStyle, photoUrl, mobileNumber: normalized },
   });
   invalidateTournamentDetail(tournamentId);
   res.status(201).json(player);
 }));
 
 router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
-  const { name, role, battingStyle, bowlingStyle, photoUrl, mobileNumber } = req.body || {};
+  const { name, role, gender, battingStyle, bowlingStyle, photoUrl, mobileNumber } = req.body || {};
+  if (gender != null && !['MALE', 'FEMALE'].includes(gender)) {
+    return res.status(400).json({ error: 'gender must be MALE or FEMALE' });
+  }
   let normalized;
   if (mobileNumber != null) {
     normalized = normalizeMobile(mobileNumber);
@@ -59,7 +65,7 @@ router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
   }
   const player = await prisma.player.update({
     where: { id: req.params.id },
-    data: { name, role, battingStyle, bowlingStyle, photoUrl, mobileNumber: normalized },
+    data: { name, role, gender, battingStyle, bowlingStyle, photoUrl, mobileNumber: normalized },
   });
   invalidateTournamentDetail(player.tournamentId);
   res.json(player);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { resolveUploadUrl } from '../api.js';
 
 const statusPill = {
   LIVE: 'bg-live/15 text-live',
@@ -31,7 +32,7 @@ export default function MatchCard({ match }) {
       {match.resultText && <p className="mt-3 text-sm font-medium text-gold">{match.resultText}</p>}
       {match.manOfMatch?.name && (
         <p className="mt-1 text-xs text-slate-500">
-          🏆 Man of the Match: <span className="font-semibold text-navy">{match.manOfMatch.name}</span>
+          🏆 Player of the Match: <span className="font-semibold text-navy">{match.manOfMatch.name}</span>
         </p>
       )}
       {!match.resultText && match.scheduledAt && (
@@ -44,7 +45,8 @@ export default function MatchCard({ match }) {
 function TeamRow({ team, isWinner, score }) {
   return (
     <div className="flex items-center justify-between">
-      <span className={`text-sm ${isWinner ? 'font-bold text-navy' : 'text-slate-600'}`}>
+      <span className={`flex items-center gap-1.5 text-sm ${isWinner ? 'font-bold text-navy' : 'text-slate-600'}`}>
+        {team?.logoUrl && <img src={resolveUploadUrl(team.logoUrl)} alt="" className="h-5 w-5 rounded-full object-cover" />}
         {team?.name} <span className="text-slate-400">({team?.shortName})</span>
       </span>
       <div className="flex items-center gap-2">

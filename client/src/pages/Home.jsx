@@ -37,15 +37,15 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-8 rounded-2xl bg-navy p-8 text-center shadow-cardHover sm:p-12">
-        <h1 className="font-display text-4xl text-brand sm:text-6xl">CData Premier League</h1>
-        <p className="mt-3 text-white/70">Score every over, live — scores, scorecards and stats for every CData tournament.</p>
+        <h1 className="font-display text-4xl text-brand sm:text-6xl">Independence Cup</h1>
+        <p className="mt-3 text-white/70">Your tournament's home for live scores and stats.</p>
       </div>
 
       {isAdmin && (
         <form onSubmit={createTournament} className="card mb-6 flex flex-wrap items-end gap-3 p-4">
           <div className="min-w-[200px] flex-1">
             <label className="label">New tournament name</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="CData Premier League 2027" />
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Independence Cup 2027" />
           </div>
           <div className="w-40">
             <label className="label">Season (optional)</label>

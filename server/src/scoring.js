@@ -182,6 +182,7 @@ function ballShorthand(b) {
   if (b.extraType === 'NOBALL') return b.runsBat > 0 ? `Nb+${b.runsBat}` : 'Nb';
   if (b.extraType === 'BYE') return `${b.extraRuns}b`;
   if (b.extraType === 'LEGBYE') return `${b.extraRuns}lb`;
+  if (b.isOverthrow) return `${b.runsBat}ot`;
   return String(b.runsBat);
 }
 

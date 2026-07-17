@@ -53,16 +53,21 @@ export default function MatchLive() {
           <p className="font-semibold text-gold">{match.resultText}</p>
           {match.manOfMatchName && (
             <p className="mt-1 text-sm text-slate-500">
-              🏆 Man of the Match: <span className="font-semibold text-navy">{match.manOfMatchName}</span>
+              🏆 Player of the Match: <span className="font-semibold text-navy">{match.manOfMatchName}</span>
             </p>
           )}
         </div>
       )}
 
       {match.tossWinnerTeamId && (
-        <p className="mb-4 text-sm text-slate-500">
+        <p className="mb-1 text-sm text-slate-500">
           {match.tossWinnerTeamId === match.teamA.id ? match.teamA.name : match.teamB.name} won the toss and chose to{' '}
           {match.tossDecision === 'BAT' ? 'bat' : 'bowl'}.
+        </p>
+      )}
+      {(match.umpire1 || match.umpire2) && (
+        <p className="mb-4 text-xs text-slate-400">
+          Umpires: {[match.umpire1, match.umpire2].filter(Boolean).join(' & ')}
         </p>
       )}
 

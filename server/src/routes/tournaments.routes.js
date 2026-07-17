@@ -23,6 +23,7 @@ const publicPlayerSelect = {
   teamId: true,
   name: true,
   role: true,
+  gender: true,
   battingStyle: true,
   bowlingStyle: true,
   photoUrl: true,
@@ -281,7 +282,7 @@ router.get('/:id/stats/leaderboards', asyncHandler(async (req, res) => {
   res.json({ topBatting: battingList.slice(0, 20), topBowling: bowlingList.slice(0, 20) });
 }));
 
-// --- Awards: per-match Man of the Match + tournament-wide Man of the Tournament ---
+// --- Awards: per-match Player of the Match + tournament-wide awards ---
 router.get('/:id/awards', asyncHandler(async (req, res) => {
   const tournamentId = req.params.id;
   const players = await prisma.player.findMany({ where: { tournamentId } });
@@ -295,8 +296,8 @@ router.get('/:id/awards', asyncHandler(async (req, res) => {
     where: { innings: { match: { tournamentId, status: 'COMPLETED' } } },
   });
 
-  // Man of the Tournament is only crowned once the tournament has actually
-  // finished: the Final (if one was set up) is completed, or - for
+  // These tournament-wide awards are only crowned once the tournament has
+  // actually finished: the Final (if one was set up) is completed, or - for
   // tournaments run without the auto-fixtures Final - every match is done.
   const finalMatch = allMatches.find((m) => m.stage === 'FINAL');
   const isComplete = finalMatch
@@ -304,11 +305,54 @@ router.get('/:id/awards', asyncHandler(async (req, res) => {
     : allMatches.length > 0 && allMatches.every((m) => m.status === 'COMPLETED' || m.status === 'ABANDONED');
 
   const tournamentAwards = computeAwardPoints(balls, players);
+  const genderById = new Map(players.map((p) => [p.id, p.gender]));
+  const womanOfTournament = tournamentAwards.find((p) => genderById.get(p.playerId) === 'FEMALE') || null;
+
+  // Best Batter: most runs across the tournament.
+  const playerById = new Map(players.map((p) => [p.id, p]));
+  const runsByPlayer = new Map();
+  for (const b of balls) {
+    if (b.extraType === 'NONE' || b.extraType === 'NOBALL') {
+      runsByPlayer.set(b.strikerId, (runsByPlayer.get(b.strikerId) || 0) + b.runsBat);
+    }
+  }
+  const [bestBatterId, bestBatterRuns] = [...runsByPlayer.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+  const bestBatter = bestBatterId ? { playerId: bestBatterId, name: playerById.get(bestBatterId)?.name || '?', runs: bestBatterRuns } : null;
+
+  // Best Bowler: most wickets, tiebreak by fewest runs conceded.
+  const bowlerStats = new Map();
+  for (const b of balls) {
+    if (!bowlerStats.has(b.bowlerId)) bowlerStats.set(b.bowlerId, { wickets: 0, runsConceded: 0 });
+    const s = bowlerStats.get(b.bowlerId);
+    if (b.isWicket && b.wicketType !== 'RUNOUT') s.wickets += 1;
+    if (b.extraType !== 'BYE') s.runsConceded += b.runsBat + b.extraRuns;
+  }
+  const [bestBowlerId, bestBowlerStats] =
+    [...bowlerStats.entries()].sort((a, b) => b[1].wickets - a[1].wickets || a[1].runsConceded - b[1].runsConceded)[0] || [];
+  const bestBowler = bestBowlerId
+    ? { playerId: bestBowlerId, name: playerById.get(bestBowlerId)?.name || '?', wickets: bestBowlerStats.wickets, runsConceded: bestBowlerStats.runsConceded }
+    : null;
+
+  // Best Catch: admin-designated (can't be derived from stats alone).
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    include: { bestCatchBall: { include: { fielder: true, innings: { include: { match: { include: { teamA: true, teamB: true } } } } } } },
+  });
+  const bestCatch = tournament?.bestCatchBall
+    ? {
+        fielderName: tournament.bestCatchBall.fielder?.name || '?',
+        matchTeams: `${tournament.bestCatchBall.innings.match.teamA.name} vs ${tournament.bestCatchBall.innings.match.teamB.name}`,
+      }
+    : null;
 
   res.json({
     isComplete,
-    manOfTournament: isComplete ? tournamentAwards[0] || null : null,
+    playerOfTournament: isComplete ? tournamentAwards[0] || null : null,
     contenders: tournamentAwards.slice(0, 10),
+    bestBatter: isComplete ? bestBatter : null,
+    bestBowler: isComplete ? bestBowler : null,
+    bestCatch: isComplete ? bestCatch : null,
+    womanOfTournament: isComplete ? womanOfTournament : null,
     matchAwards: completedMatches.map((m) => ({
       matchId: m.id,
       teamA: m.teamA.name,
@@ -318,6 +362,38 @@ router.get('/:id/awards', asyncHandler(async (req, res) => {
       manOfMatchName: m.manOfMatch?.name || null,
     })),
   });
+}));
+
+// --- Best Catch: admin picks from all catches taken in the tournament ---
+router.get('/:id/catches', requireAdmin, asyncHandler(async (req, res) => {
+  const tournamentId = req.params.id;
+  const balls = await prisma.ball.findMany({
+    where: { isWicket: true, wicketType: 'CAUGHT', innings: { match: { tournamentId, status: 'COMPLETED' } } },
+    include: {
+      fielder: true,
+      dismissed: true,
+      innings: { include: { match: { include: { teamA: true, teamB: true } } } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json(
+    balls.map((b) => ({
+      ballId: b.id,
+      fielderName: b.fielder?.name || 'Unknown',
+      dismissedName: b.dismissed?.name || 'Unknown',
+      matchTeams: `${b.innings.match.teamA.name} vs ${b.innings.match.teamB.name}`,
+      overStr: `${b.overNumber}.${b.ballInOver}`,
+    }))
+  );
+}));
+
+router.post('/:id/best-catch', requireAdmin, asyncHandler(async (req, res) => {
+  const { ballId } = req.body || {};
+  const tournament = await prisma.tournament.update({
+    where: { id: req.params.id },
+    data: { bestCatchBallId: ballId || null },
+  });
+  res.json(tournament);
 }));
 
 // --- Fixtures: round-robin league stage, then a Final between the top 2 ---

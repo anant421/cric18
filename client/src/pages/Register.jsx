@@ -21,6 +21,7 @@ export default function Register() {
   const [teamId, setTeamId] = useState('');
   const [name, setName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
+  const [gender, setGender] = useState('MALE');
   const [role, setRole] = useState('BATSMAN');
   const [battingStyle, setBattingStyle] = useState(BATTING_STYLES[0]);
   const [bowlingStyle, setBowlingStyle] = useState(BOWLING_STYLES[0]);
@@ -59,6 +60,7 @@ export default function Register() {
         name: name.trim(),
         mobileNumber: mobileNumber.trim(),
         role,
+        gender,
         battingStyle,
         bowlingStyle: bowlingStyle === 'None' ? null : bowlingStyle,
         photoUrl,
@@ -123,15 +125,24 @@ export default function Register() {
           <p className="mt-1 text-xs text-slate-400">Used only to prevent duplicate registrations - never shown publicly.</p>
         </div>
 
-        <div>
-          <label className="label">Role</label>
-          <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Role</label>
+            <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Gender</label>
+            <select className="input" value={gender} onChange={(e) => setGender(e.target.value)}>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api.js';
+import { api, resolveUploadUrl } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const ROLES = ['BATSMAN', 'BOWLER', 'ALLROUNDER', 'WICKETKEEPER'];
@@ -159,14 +159,16 @@ function TeamCard({ team, tournamentId, token, onChange, onRemove }) {
   const [playerName, setPlayerName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [role, setRole] = useState('BATSMAN');
+  const [gender, setGender] = useState('MALE');
   const [error, setError] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const addPlayer = async (e) => {
     e.preventDefault();
     if (!playerName || !mobileNumber) return;
     setError('');
     try {
-      await api.post('/players', { tournamentId, teamId: team.id, name: playerName, mobileNumber, role }, token);
+      await api.post('/players', { tournamentId, teamId: team.id, name: playerName, mobileNumber, role, gender }, token);
       setPlayerName('');
       setMobileNumber('');
       onChange();
@@ -185,11 +187,33 @@ function TeamCard({ team, tournamentId, token, onChange, onRemove }) {
     }
   };
 
+  const uploadLogo = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('photo', file);
+      const uploaded = await api.upload('/upload/photo', form);
+      await api.patch(`/teams/${team.id}`, { logoUrl: uploaded.url }, token);
+      onChange();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   return (
     <div className="card p-4">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full" style={{ background: team.colorHex }} />
+          {team.logoUrl ? (
+            <img src={resolveUploadUrl(team.logoUrl)} alt={team.name} className="h-8 w-8 rounded-full object-cover" />
+          ) : (
+            <span className="h-3 w-3 rounded-full" style={{ background: team.colorHex }} />
+          )}
           <h3 className="font-bold">
             {team.name} <span className="text-xs text-slate-400">({team.shortName})</span>
           </h3>
@@ -198,6 +222,11 @@ function TeamCard({ team, tournamentId, token, onChange, onRemove }) {
           Remove team
         </button>
       </div>
+
+      <label className="mb-3 flex items-center gap-2 text-xs text-slate-500">
+        <span>{uploadingLogo ? 'Uploading…' : team.logoUrl ? 'Change logo' : 'Upload team logo'}</span>
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadLogo} disabled={uploadingLogo} className="text-xs" />
+      </label>
 
       <ul className="mb-3 space-y-1 text-sm">
         {team.players.map((p) => (
@@ -233,6 +262,10 @@ function TeamCard({ team, tournamentId, token, onChange, onRemove }) {
               {r}
             </option>
           ))}
+        </select>
+        <select className="input w-auto" value={gender} onChange={(e) => setGender(e.target.value)}>
+          <option value="MALE">Male</option>
+          <option value="FEMALE">Female</option>
         </select>
         <button className="btn-secondary shrink-0" disabled={!playerName || !mobileNumber}>
           Add

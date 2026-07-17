@@ -19,7 +19,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link to="/" className="flex items-center">
-          <img src="/cdata-logo.svg" alt="CDATA" className="h-6" />
+          <img src="/logo.svg" alt="ScoreXI" className="h-20" />
         </Link>
         <div className="flex items-center gap-2">
           {viewedTournamentId && (

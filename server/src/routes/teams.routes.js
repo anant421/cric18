@@ -19,10 +19,10 @@ router.post('/', requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
-  const { name, shortName, colorHex } = req.body || {};
+  const { name, shortName, colorHex, logoUrl } = req.body || {};
   const team = await prisma.team.update({
     where: { id: req.params.id },
-    data: { name, shortName, colorHex },
+    data: { name, shortName, colorHex, logoUrl },
   });
   invalidateTournamentDetail(team.tournamentId);
   res.json(team);

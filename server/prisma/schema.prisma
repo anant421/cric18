@@ -11,6 +11,7 @@
 //   ExtraType:    NONE | WIDE | NOBALL | BYE | LEGBYE
 //   WicketType:   BOWLED | CAUGHT | LBW | RUNOUT | STUMPED | HITWICKET | RETIRED
 //   MatchStage:   LEAGUE | FINAL
+//   Gender:       MALE | FEMALE
 
 generator client {
   provider = "prisma-client-js"
@@ -27,6 +28,12 @@ model Tournament {
   season    String?
   createdAt DateTime @default(now())
 
+  // Admin-designated highlight - which specific catch (by ball) was the
+  // best of the tournament. Unlike the other awards this can't be derived
+  // from stats alone, so it's a manual pick from among all catches taken.
+  bestCatchBallId String? @unique
+  bestCatchBall   Ball?   @relation("BestCatchOfTournament", fields: [bestCatchBallId], references: [id], onDelete: SetNull)
+
   teams   Team[]
   players Player[]
   matches Match[]
@@ -39,6 +46,7 @@ model Team {
   name         String
   shortName    String
   colorHex     String     @default("#1d9bf0")
+  logoUrl      String?
   createdAt    DateTime   @default(now())
 
   players       Player[]
@@ -56,6 +64,7 @@ model Player {
   team         Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
   name         String
   role         String     @default("BATSMAN")
+  gender       String?
   battingStyle String?
   bowlingStyle String?
   photoUrl     String?
@@ -92,6 +101,8 @@ model Match {
   tossWinnerTeamId String?
   tossWinnerTeam    Team?   @relation("TossWinner", fields: [tossWinnerTeamId], references: [id], onDelete: Cascade)
   tossDecision      String?
+  umpire1           String?
+  umpire2           String?
 
   currentInningsNumber Int @default(0)
 
@@ -140,9 +151,13 @@ model Ball {
   bowlerId     String
   bowler       Player @relation("Bowler", fields: [bowlerId], references: [id], onDelete: Cascade)
 
-  runsBat   Int    @default(0)
-  extraType String @default("NONE")
-  extraRuns Int    @default(0)
+  runsBat     Int     @default(0)
+  extraType   String  @default("NONE")
+  extraRuns   Int     @default(0)
+  // Runs taken off a fielding-error overthrow, already included in runsBat
+  // (they count fully toward the batter per the Laws) - this flag is purely
+  // so the UI can show e.g. "7ot" instead of a plain "7".
+  isOverthrow Boolean @default(false)
 
   isWicket    Boolean @default(false)
   wicketType  String?
@@ -153,6 +168,8 @@ model Ball {
 
   isFreeHit Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  bestCatchOfTournament Tournament? @relation("BestCatchOfTournament")
 
   @@index([inningsId, sequence])
 }

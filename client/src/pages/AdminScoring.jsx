@@ -109,12 +109,14 @@ export default function AdminScoring() {
 function TossForm({ match, token, onDone, onError }) {
   const [tossWinnerTeamId, setTossWinnerTeamId] = useState('');
   const [tossDecision, setTossDecision] = useState('BAT');
+  const [umpire1, setUmpire1] = useState('');
+  const [umpire2, setUmpire2] = useState('');
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
     setSaving(true);
     try {
-      await api.post(`/matches/${match.id}/toss`, { tossWinnerTeamId, tossDecision }, token);
+      await api.post(`/matches/${match.id}/toss`, { tossWinnerTeamId, tossDecision, umpire1, umpire2 }, token);
       onDone();
     } catch (err) {
       onError(err.message);
@@ -153,6 +155,16 @@ function TossForm({ match, token, onDone, onError }) {
             {d === 'BAT' ? 'Bat' : 'Bowl'}
           </button>
         ))}
+      </div>
+      <div className="mb-5 grid grid-cols-2 gap-2">
+        <div>
+          <label className="label">Umpire 1 (optional)</label>
+          <input className="input" value={umpire1} onChange={(e) => setUmpire1(e.target.value)} placeholder="Name" />
+        </div>
+        <div>
+          <label className="label">Umpire 2 (optional)</label>
+          <input className="input" value={umpire2} onChange={(e) => setUmpire2(e.target.value)} placeholder="Name" />
+        </div>
       </div>
       <button className="btn-primary w-full" disabled={!tossWinnerTeamId || saving} onClick={submit}>
         {saving ? 'Starting…' : 'Confirm Toss & Start Innings 1'}

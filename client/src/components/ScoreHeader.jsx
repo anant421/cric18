@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveUploadUrl } from '../api.js';
 
 function teamName(match, teamId) {
   if (teamId === match.teamA.id) return match.teamA;
@@ -22,7 +23,10 @@ export default function ScoreHeader({ match, innings }) {
     <div className="card p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">
+          <p className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-400">
+            {battingTeam?.logoUrl && (
+              <img src={resolveUploadUrl(battingTeam.logoUrl)} alt="" className="h-4 w-4 rounded-full object-cover" />
+            )}
             {battingTeam?.name} batting · Innings {innings.inningsNumber}
           </p>
           <p className="mt-1 text-4xl font-extrabold tabular-nums">

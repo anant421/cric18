@@ -29,7 +29,7 @@ function scoreMapFromState(state) {
 
 export default function TournamentDetail() {
   const { id } = useParams();
-  const { isAdmin } = useAuth();
+  const { isAdmin, token } = useAuth();
   const [tournament, setTournament] = useState(null);
   const [tab, setTab] = useState('Matches');
   const [pointsTable, setPointsTable] = useState(null);
@@ -176,7 +176,11 @@ export default function TournamentDetail() {
             {tournament.teams.map((team) => (
               <div key={team.id} className="card p-4">
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full" style={{ background: team.colorHex }} />
+                  {team.logoUrl ? (
+                    <img src={resolveUploadUrl(team.logoUrl)} alt={team.name} className="h-7 w-7 rounded-full object-cover" />
+                  ) : (
+                    <span className="h-3 w-3 rounded-full" style={{ background: team.colorHex }} />
+                  )}
                   <h3 className="font-bold">{team.name}</h3>
                   <span className="text-xs text-slate-400">({team.shortName})</span>
                 </div>
@@ -202,37 +206,57 @@ export default function TournamentDetail() {
           </div>
         )}
 
-        {tab === 'Awards' && <AwardsTab awards={awards} />}
+        {tab === 'Awards' && (
+          <AwardsTab awards={awards} tournamentId={tournament.id} isAdmin={isAdmin} token={token} onChange={() => setAwards(null)} />
+        )}
       </div>
     </div>
   );
 }
 
-function AwardsTab({ awards }) {
+function AwardCard({ title, emoji, name, detail }) {
+  if (!name) return null;
+  return (
+    <div className="card p-5 text-center">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mt-1 text-xl font-extrabold text-navy">
+        {emoji} {name}
+      </p>
+      {detail && <p className="mt-1 text-sm text-slate-500">{detail}</p>}
+    </div>
+  );
+}
+
+function AwardsTab({ awards, tournamentId, isAdmin, token, onChange }) {
   if (!awards) return <p className="text-slate-400">Loading…</p>;
-  if (!awards.manOfTournament && awards.contenders.length === 0 && awards.matchAwards.length === 0) {
+  const hasAnyTournamentAward = awards.playerOfTournament || awards.bestBatter || awards.bestBowler || awards.bestCatch || awards.womanOfTournament;
+  if (!hasAnyTournamentAward && awards.contenders.length === 0 && awards.matchAwards.length === 0) {
     return <p className="text-slate-400">Awards are calculated automatically as matches are completed.</p>;
   }
   return (
     <div className="space-y-6">
-      {awards.manOfTournament ? (
-        <div className="card p-5 text-center">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Man of the Tournament</p>
-          <p className="mt-1 text-2xl font-extrabold text-navy">🏆 {awards.manOfTournament.name}</p>
-          <p className="mt-1 text-sm text-slate-500">{awards.manOfTournament.totalPoints} points</p>
-        </div>
-      ) : (
-        awards.contenders.length > 0 && (
-          <p className="text-sm text-slate-500">
-            Tournament still in progress — here are the current contenders for Man of the Tournament. The winner is revealed once the Final is played.
-          </p>
-        )
+      {!awards.isComplete && awards.contenders.length > 0 && (
+        <p className="text-sm text-slate-500">
+          Tournament still in progress — here are the current contenders. The end-of-tournament awards are revealed once the Final is played.
+        </p>
       )}
+
+      {awards.isComplete && hasAnyTournamentAward && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <AwardCard title="Player of the Tournament" emoji="🏆" name={awards.playerOfTournament?.name} detail={awards.playerOfTournament && `${awards.playerOfTournament.totalPoints} points`} />
+          <AwardCard title="Best Batter of the Tournament" emoji="🏏" name={awards.bestBatter?.name} detail={awards.bestBatter && `${awards.bestBatter.runs} runs`} />
+          <AwardCard title="Best Bowler of the Tournament" emoji="🎯" name={awards.bestBowler?.name} detail={awards.bestBowler && `${awards.bestBowler.wickets} wickets`} />
+          <AwardCard title="Best Catch of the Tournament" emoji="🙌" name={awards.bestCatch?.fielderName} detail={awards.bestCatch?.matchTeams} />
+          <AwardCard title="Woman of the Tournament" emoji="🌟" name={awards.womanOfTournament?.name} detail={awards.womanOfTournament && `${awards.womanOfTournament.totalPoints} points`} />
+        </div>
+      )}
+
+      {isAdmin && <BestCatchPicker tournamentId={tournamentId} token={token} current={awards.bestCatch} onChange={onChange} />}
 
       {awards.contenders.length > 0 && (
         <div className="card overflow-hidden">
           <h3 className="border-b border-border px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            {awards.manOfTournament ? 'Points Leaderboard' : 'Contenders'}
+            {awards.isComplete ? 'Points Leaderboard' : 'Contenders'}
           </h3>
           <table className="w-full text-sm">
             <tbody>
@@ -251,7 +275,7 @@ function AwardsTab({ awards }) {
       {awards.matchAwards.length > 0 && (
         <div className="card overflow-hidden">
           <h3 className="border-b border-border px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            Man of the Match — by Game
+            Player of the Match — by Game
           </h3>
           <ul className="divide-y divide-border/60">
             {awards.matchAwards.map((m) => (
@@ -265,6 +289,56 @@ function AwardsTab({ awards }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+function BestCatchPicker({ tournamentId, token, current, onChange }) {
+  const [catches, setCatches] = useState(null);
+  const [selected, setSelected] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get(`/tournaments/${tournamentId}/catches`, token).then(setCatches).catch((e) => setError(e.message));
+  }, [tournamentId]);
+
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await api.post(`/tournaments/${tournamentId}/best-catch`, { ballId: selected || null }, token);
+      onChange();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!catches) return null;
+  if (catches.length === 0) {
+    return <p className="text-xs text-slate-400">No catches recorded yet — the Best Catch award can be picked once one has been taken.</p>;
+  }
+
+  return (
+    <div className="card p-4">
+      <p className="mb-2 text-sm font-semibold">Pick Best Catch of the Tournament</p>
+      <p className="mb-3 text-xs text-slate-500">This can't be worked out from stats alone — pick the standout catch from everyone taken so far.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select className="input" value={selected} onChange={(e) => setSelected(e.target.value)}>
+          <option value="">{current ? `Current: ${current.fielderName} (${current.matchTeams})` : 'Select a catch…'}</option>
+          {catches.map((c) => (
+            <option key={c.ballId} value={c.ballId}>
+              {c.fielderName} c. {c.dismissedName} · {c.matchTeams} · ov {c.overStr}
+            </option>
+          ))}
+        </select>
+        <button className="btn-primary" disabled={saving || !selected} onClick={save}>
+          {saving ? 'Saving…' : 'Set as Best Catch'}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
