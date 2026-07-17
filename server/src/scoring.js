@@ -21,7 +21,10 @@ export function inningsSummary(innings, balls, players, oversLimit) {
   const totalRuns = balls.reduce((s, b) => s + ballTotalRuns(b), 0);
   const totalWickets = balls.filter((b) => b.isWicket).length;
   const legalBalls = balls.filter((b) => b.isLegal).length;
-  const battingTeamPlayerCount = players.filter((p) => p.teamId === innings.battingTeamId).length;
+  // Squads can carry more than 11 registered players (substitutes on the
+  // bench), but an innings is only ever played by 11 - cap here so a 13-man
+  // squad doesn't wrongly let the innings run to 12 wickets down.
+  const battingTeamPlayerCount = Math.min(players.filter((p) => p.teamId === innings.battingTeamId).length, 11);
   const allOut = battingTeamPlayerCount > 0 && totalWickets >= battingTeamPlayerCount - 1;
   const oversDone = legalBalls >= oversLimit * 6;
   const target = innings.target;

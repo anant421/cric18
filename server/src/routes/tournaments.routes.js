@@ -173,7 +173,8 @@ async function computePointsTable(tournamentId) {
       const totalRuns = inningsBalls.reduce((s, x) => s + x.runsBat + x.extraRuns, 0);
       const legalBalls = inningsBalls.filter((x) => x.isLegal).length;
       const wickets = inningsBalls.filter((x) => x.isWicket).length;
-      const battingSquadSize = playerCount.get(inn.battingTeamId) || 0;
+      // Cap at 11 - squads can carry substitutes beyond the playing XI.
+      const battingSquadSize = Math.min(playerCount.get(inn.battingTeamId) || 0, 11);
       const allOut = battingSquadSize > 0 && wickets >= battingSquadSize - 1;
       // ICC rule: a side bowled out inside its overs is deemed to have used
       // its full quota for its own run-rate calculation; the bowling side's

@@ -1,31 +1,49 @@
-<svg viewBox="0 0 128 100" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="batGrad" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#FFF3A3" />
       <stop offset="100%" stop-color="#FFE500" />
     </linearGradient>
+    <radialGradient id="badgeGrad" cx="38%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#FFF3A3" />
+      <stop offset="60%" stop-color="#FFE500" />
+      <stop offset="100%" stop-color="#F2C400" />
+    </radialGradient>
+    <clipPath id="badgeClip">
+      <circle cx="75" cy="78" r="70" />
+    </clipPath>
   </defs>
 
-  <ellipse cx="64" cy="90" rx="48" ry="5" fill="#000000" opacity="0.28" />
+  <circle cx="75" cy="78" r="72" fill="#15151C" opacity="0.12" />
 
-  <g>
-    <rect x="46" y="26" width="7" height="56" rx="2.5" fill="#FFF8CC" />
-    <rect x="58" y="26" width="7" height="56" rx="2.5" fill="#FFF8CC" />
-    <rect x="70" y="26" width="7" height="56" rx="2.5" fill="#FFF8CC" />
-    <rect x="44" y="20" width="20" height="7" rx="3" fill="#FFF8CC" />
-    <rect x="59" y="20" width="20" height="7" rx="3" fill="#FFF8CC" />
+  <g clip-path="url(#badgeClip)">
+    <circle cx="75" cy="78" r="70" fill="url(#badgeGrad)" />
+    <circle cx="46" cy="46" r="62" fill="#15151C" opacity="0.14" />
+    <circle cx="112" cy="118" r="58" fill="#E11D48" opacity="0.16" />
+
+    <ellipse cx="85" cy="113" rx="48" ry="5" fill="#000000" opacity="0.22" />
+
+    <g>
+      <rect x="56" y="46" width="7" height="56" rx="2.5" fill="#FFF8CC" />
+      <rect x="68" y="46" width="7" height="56" rx="2.5" fill="#FFF8CC" />
+      <rect x="80" y="46" width="7" height="56" rx="2.5" fill="#FFF8CC" />
+      <rect x="54" y="40" width="20" height="7" rx="3" fill="#FFF8CC" />
+      <rect x="69" y="40" width="20" height="7" rx="3" fill="#FFF8CC" />
+    </g>
+
+    <g transform="translate(105,107) rotate(18)">
+      <rect x="-5.5" y="-74" width="11" height="32" rx="5" fill="#8B5A2B" />
+      <rect x="-5.5" y="-62" width="11" height="2.4" fill="#FFF8CC" opacity="0.55" />
+      <rect x="-5.5" y="-56" width="11" height="2.4" fill="#FFF8CC" opacity="0.55" />
+      <path d="M -10 -46 Q -10 -54 0 -54 Q 10 -54 10 -46 L 10 -6 Q 10 12 0 20 Q -10 12 -10 -6 Z" fill="url(#batGrad)" stroke="#15151C" stroke-width="1.4" />
+      <path d="M -9 -22 Q 0 -18 9 -22" stroke="#D8B85A" stroke-width="1" opacity="0.55" fill="none" />
+    </g>
+
+    <circle cx="34" cy="103" r="17" fill="#E11D48" />
+    <circle cx="28" cy="96.5" r="5.5" fill="#FFFFFF" opacity="0.18" />
+    <path d="M 19 97 Q 34 107 49 97" fill="none" stroke="#FFF8CC" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M 24 96 l 2.4 3.6 M 30 100.5 l 2.4 3.6 M 40 100.5 l 2.4 3.6 M 46 96 l 2.4 3.6" stroke="#FFF8CC" stroke-width="1.2" stroke-linecap="round" />
   </g>
 
-  <g transform="translate(95,84) rotate(18)">
-    <rect x="-5.5" y="-74" width="11" height="32" rx="5" fill="#8B5A2B" />
-    <rect x="-5.5" y="-62" width="11" height="2.4" fill="#FFF8CC" opacity="0.55" />
-    <rect x="-5.5" y="-56" width="11" height="2.4" fill="#FFF8CC" opacity="0.55" />
-    <path d="M -10 -46 Q -10 -54 0 -54 Q 10 -54 10 -46 L 10 -6 Q 10 12 0 20 Q -10 12 -10 -6 Z" fill="url(#batGrad)" stroke="#15151C" stroke-width="1.4" />
-    <path d="M -9 -22 Q 0 -18 9 -22" stroke="#D8B85A" stroke-width="1" opacity="0.55" fill="none" />
-  </g>
-
-  <circle cx="24" cy="80" r="17" fill="#E11D48" />
-  <circle cx="18" cy="73.5" r="5.5" fill="#FFFFFF" opacity="0.18" />
-  <path d="M 9 74 Q 24 84 39 74" fill="none" stroke="#FFF8CC" stroke-width="1.8" stroke-linecap="round" />
-  <path d="M 14 73 l 2.4 3.6 M 20 77.5 l 2.4 3.6 M 30 77.5 l 2.4 3.6 M 36 73 l 2.4 3.6" stroke="#FFF8CC" stroke-width="1.2" stroke-linecap="round" />
+  <circle cx="75" cy="78" r="70" fill="none" stroke="#15151C" stroke-width="2" opacity="0.5" />
 </svg>

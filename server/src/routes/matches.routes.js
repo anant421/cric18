@@ -246,7 +246,9 @@ async function maybeFinishInningsOrMatch(matchId, inningsId) {
     const first = state.innings.find((i) => i.inningsNumber === 1);
     const second = inn;
     const match = await prisma.match.findUnique({ where: { id: matchId }, include: { teamA: { include: { players: true } }, teamB: { include: { players: true } } } });
-    const secondTeamPlayerCount = second.battingTeamId === match.teamAId ? match.teamA.players.length : match.teamB.players.length;
+    // Cap at 11 - a squad can carry substitutes beyond the playing XI, but
+    // only 11 ever bat, so the win margin should never exceed 10 wickets.
+    const secondTeamPlayerCount = Math.min(second.battingTeamId === match.teamAId ? match.teamA.players.length : match.teamB.players.length, 11);
 
     let winnerTeamId = null;
     let resultText = 'Match tied';

@@ -230,18 +230,38 @@ function AwardCard({ title, emoji, name, detail }) {
 function AwardsTab({ awards, tournamentId, isAdmin, token, onChange }) {
   if (!awards) return <p className="text-slate-400">Loading…</p>;
   const hasAnyTournamentAward = awards.playerOfTournament || awards.bestBatter || awards.bestBowler || awards.bestCatch || awards.womanOfTournament;
-  if (!hasAnyTournamentAward && awards.contenders.length === 0 && awards.matchAwards.length === 0) {
-    return <p className="text-slate-400">Awards are calculated automatically as matches are completed.</p>;
+  if (!awards.isComplete && awards.matchAwards.length === 0) {
+    return <p className="text-slate-400">Awards are calculated automatically once the tournament is complete.</p>;
+  }
+  if (!awards.isComplete) {
+    return (
+      <div className="space-y-6">
+        <p className="text-sm text-slate-500">
+          Tournament still in progress — end-of-tournament awards are revealed once the Final is played.
+        </p>
+        {awards.matchAwards.length > 0 && (
+          <div className="card overflow-hidden">
+            <h3 className="border-b border-border px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Player of the Match — by Game
+            </h3>
+            <ul className="divide-y divide-border/60">
+              {awards.matchAwards.map((m) => (
+                <li key={m.matchId} className="flex items-center justify-between px-4 py-3 text-sm">
+                  <span className="text-slate-500">
+                    {m.teamA} vs {m.teamB}
+                  </span>
+                  <span className="font-semibold text-navy">{m.manOfMatchName || '—'}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
   }
   return (
     <div className="space-y-6">
-      {!awards.isComplete && awards.contenders.length > 0 && (
-        <p className="text-sm text-slate-500">
-          Tournament still in progress — here are the current contenders. The end-of-tournament awards are revealed once the Final is played.
-        </p>
-      )}
-
-      {awards.isComplete && hasAnyTournamentAward && (
+      {hasAnyTournamentAward && (
         <div className="grid gap-4 sm:grid-cols-2">
           <AwardCard title="Player of the Tournament" emoji="🏆" name={awards.playerOfTournament?.name} detail={awards.playerOfTournament && `${awards.playerOfTournament.totalPoints} points`} />
           <AwardCard title="Best Batter of the Tournament" emoji="🏏" name={awards.bestBatter?.name} detail={awards.bestBatter && `${awards.bestBatter.runs} runs`} />
@@ -256,7 +276,7 @@ function AwardsTab({ awards, tournamentId, isAdmin, token, onChange }) {
       {awards.contenders.length > 0 && (
         <div className="card overflow-hidden">
           <h3 className="border-b border-border px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            {awards.isComplete ? 'Points Leaderboard' : 'Contenders'}
+            Points Leaderboard
           </h3>
           <table className="w-full text-sm">
             <tbody>
