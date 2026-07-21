@@ -2,6 +2,7 @@ import React from 'react';
 
 const chipStyle = (b) => {
   if (b === 'W') return 'bg-live text-white';
+  if (b === 'H') return 'bg-gold text-white';
   if (b.startsWith('Wd') || b.startsWith('Nb')) return 'bg-accent/80 text-white';
   if (b === '4') return 'bg-brand/80 text-navy';
   if (b === '6') return 'bg-brand text-navy';
@@ -22,9 +23,12 @@ export default function OverTicker({ overs }) {
             {o.balls.map((b, idx) => (
               <span
                 key={idx}
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${chipStyle(b)}`}
+                title={b.voided ? 'Voided - over ended early, this ball does not count toward the overs used' : undefined}
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                  b.voided ? 'bg-surface2 text-slate-400 line-through opacity-60' : chipStyle(b.text)
+                }`}
               >
-                {b}
+                {b.text}
               </span>
             ))}
           </div>

@@ -23,7 +23,7 @@ export default function BattingTable({ rows, strikerId }) {
                   {p.name}
                   {p.playerId === strikerId && <span className="ml-1 text-gold">*</span>}
                 </div>
-                <div className="text-xs text-slate-400">{p.isOut ? p.dismissal : 'not out'}</div>
+                <div className="text-xs text-slate-400">{p.dismissal || 'not out'}</div>
               </td>
               <td className="px-2 py-2.5 text-center font-bold">{p.runs}</td>
               <td className="px-2 py-2.5 text-center text-slate-600">{p.balls}</td>

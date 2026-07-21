@@ -27,6 +27,13 @@ export default function AdminScoring() {
   const [showWicket, setShowWicket] = useState(false);
   const [pendingBatsmanId, setPendingBatsmanId] = useState(null);
   const [pendingBowlerId, setPendingBowlerId] = useState(null);
+  // Manual backup override, for when the derived state is wrong for any
+  // reason - takes priority over everything else when set. Reset every ball
+  // so a correction never silently carries over to deliveries it wasn't
+  // meant for.
+  const [manualStrikerId, setManualStrikerId] = useState(null);
+  const [manualNonStrikerId, setManualNonStrikerId] = useState(null);
+  const [manualBowlerId, setManualBowlerId] = useState(null);
 
   const refresh = () => api.get(`/matches/${id}`).then(setMatch).catch((e) => setError(e.message));
 
@@ -46,6 +53,9 @@ export default function AdminScoring() {
   useEffect(() => {
     setPendingBatsmanId(null);
     setPendingBowlerId(null);
+    setManualStrikerId(null);
+    setManualNonStrikerId(null);
+    setManualBowlerId(null);
   }, [match?.currentInningsNumber, match?.innings?.[match.currentInningsNumber - 1]?.expectedSequence]);
 
   if (error) return <p className="mx-auto max-w-3xl px-4 py-8 text-red-600">{error}</p>;
@@ -87,6 +97,12 @@ export default function AdminScoring() {
           pendingBowlerId={pendingBowlerId}
           setPendingBatsmanId={setPendingBatsmanId}
           setPendingBowlerId={setPendingBowlerId}
+          manualStrikerId={manualStrikerId}
+          manualNonStrikerId={manualNonStrikerId}
+          manualBowlerId={manualBowlerId}
+          setManualStrikerId={setManualStrikerId}
+          setManualNonStrikerId={setManualNonStrikerId}
+          setManualBowlerId={setManualBowlerId}
           showWicket={showWicket}
           setShowWicket={setShowWicket}
           onError={setError}
@@ -181,6 +197,12 @@ function ScoringConsole({
   pendingBowlerId,
   setPendingBatsmanId,
   setPendingBowlerId,
+  manualStrikerId,
+  manualNonStrikerId,
+  manualBowlerId,
+  setManualStrikerId,
+  setManualNonStrikerId,
+  setManualBowlerId,
   showWicket,
   setShowWicket,
   onError,
@@ -206,15 +228,15 @@ function ScoringConsole({
     );
   }
 
-  const effectiveStrikerId = innings.live.strikerId || (innings.live.outSlot === 'striker' ? pendingBatsmanId : null);
-  const effectiveNonStrikerId = innings.live.nonStrikerId || (innings.live.outSlot === 'nonStriker' ? pendingBatsmanId : null);
-  const effectiveBowlerId = innings.live.bowlerId || pendingBowlerId;
+  const effectiveStrikerId = manualStrikerId || innings.live.strikerId || (innings.live.outSlot === 'striker' ? pendingBatsmanId : null);
+  const effectiveNonStrikerId = manualNonStrikerId || innings.live.nonStrikerId || (innings.live.outSlot === 'nonStriker' ? pendingBatsmanId : null);
+  const effectiveBowlerId = manualBowlerId || innings.live.bowlerId || pendingBowlerId;
 
   const outIds = innings.battingCard.filter((b) => b.isOut).map((b) => b.playerId);
   const survivorId = innings.live.outSlot === 'striker' ? innings.live.nonStrikerId : innings.live.strikerId;
 
-  const needsBatsmanPick = !innings.summary.isDone && innings.live.needsNewBatsman && !pendingBatsmanId;
-  const needsBowlerPick = !innings.summary.isDone && innings.live.needsNewBowler && !pendingBowlerId;
+  const needsBatsmanPick = !innings.summary.isDone && innings.live.needsNewBatsman && !pendingBatsmanId && !manualStrikerId && !manualNonStrikerId;
+  const needsBowlerPick = !innings.summary.isDone && innings.live.needsNewBowler && !pendingBowlerId && !manualBowlerId;
 
   const canScore = !innings.summary.isDone && effectiveStrikerId && effectiveNonStrikerId && effectiveBowlerId;
 
@@ -250,11 +272,37 @@ function ScoringConsole({
     }
   };
 
+  // Only meaningful mid-over, once at least one ball has actually been
+  // bowled in it - and only while scoring is otherwise active (not while
+  // already waiting on a new batsman/bowler pick).
+  const currentOver = innings.overByOver[innings.overByOver.length - 1];
+  const canEndOverEarly = canScore && currentOver && currentOver.balls.length > 0;
+
+  const endOverEarly = async () => {
+    if (!confirm("End this over now? The balls already bowled keep their runs/wickets, but a new bowler will be needed and the next ball starts a fresh over.")) return;
+    try {
+      await api.post(`/matches/${match.id}/end-over`, { inningsId: innings.id }, token);
+    } catch (err) {
+      onError(err.message);
+    }
+  };
+
   const strikerName = (id) => battingTeamPlayers.find((p) => p.id === id)?.name || '?';
 
   return (
     <div className="space-y-5">
       <ScoreHeader match={match} innings={innings} />
+
+      <ManualCorrectionPanel
+        battingTeamPlayers={battingTeamPlayers}
+        bowlingTeamPlayers={bowlingTeamPlayers}
+        strikerId={effectiveStrikerId}
+        nonStrikerId={effectiveNonStrikerId}
+        bowlerId={effectiveBowlerId}
+        onSetStriker={setManualStrikerId}
+        onSetNonStriker={setManualNonStrikerId}
+        onSetBowler={setManualBowlerId}
+      />
 
       {innings.summary.isDone && innings.inningsNumber === 1 && match.innings.length === 1 && (
         <button
@@ -280,25 +328,31 @@ function ScoringConsole({
         />
       )}
 
+      {canEndOverEarly && (
+        <button className="btn-secondary w-full" onClick={endOverEarly}>
+          End Over Early — Bowler Barred
+        </button>
+      )}
+
       <div className="card p-4">
         <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">This Over</h3>
         <OverTicker overs={innings.overByOver} />
       </div>
       <div className="card overflow-hidden">
         <h3 className="border-b border-border px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-500">Batting</h3>
-        <BattingTable rows={innings.battingCard} strikerId={innings.live.strikerId} />
+        <BattingTable rows={innings.battingCard} strikerId={effectiveStrikerId} />
       </div>
       <div className="card overflow-hidden">
         <h3 className="border-b border-border px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-500">Bowling</h3>
-        <BowlingTable rows={innings.bowlingCard} bowlerId={innings.live.bowlerId} />
+        <BowlingTable rows={innings.bowlingCard} bowlerId={effectiveBowlerId} />
       </div>
 
       {showWicket && (
         <WicketModal
-          strikerId={innings.live.strikerId}
-          strikerName={strikerName(innings.live.strikerId)}
-          nonStrikerId={innings.live.nonStrikerId}
-          nonStrikerName={strikerName(innings.live.nonStrikerId)}
+          strikerId={effectiveStrikerId}
+          strikerName={strikerName(effectiveStrikerId)}
+          nonStrikerId={effectiveNonStrikerId}
+          nonStrikerName={strikerName(effectiveNonStrikerId)}
           fieldingPlayers={bowlingTeamPlayers}
           onClose={() => setShowWicket(false)}
           onSubmit={(w) => submitBall({ type: 'RUN', runs: w.runs, isWicket: true, wicketType: w.wicketType, dismissedId: w.dismissedId, fielderId: w.fielderId })}
@@ -321,6 +375,83 @@ function ScoringConsole({
           excludeIds={[innings.live.previousBowlerId].filter(Boolean)}
           onSelect={setPendingBowlerId}
         />
+      )}
+    </div>
+  );
+}
+
+// Backup for when the derived state is wrong for any reason - lets the
+// admin directly set who's on strike, who's the non-striker, and who's
+// bowling right now, overriding whatever was worked out from the ball log.
+// Collapsed by default since it's only meant to be reached for when
+// something needs correcting, not part of the normal scoring flow.
+function ManualCorrectionPanel({
+  battingTeamPlayers,
+  bowlingTeamPlayers,
+  strikerId,
+  nonStrikerId,
+  bowlerId,
+  onSetStriker,
+  onSetNonStriker,
+  onSetBowler,
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="card p-4">
+      <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen((o) => !o)}>
+        <span className="text-sm font-bold uppercase tracking-wide text-slate-500">Manual Correction (backup)</span>
+        <span className="text-xs text-slate-400">{open ? 'Hide' : 'Show'}</span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-slate-500">
+            Only use this if something's wrong - it directly overrides who's on strike, non-strike, or bowling for the next ball you score.
+          </p>
+          <div>
+            <label className="label">Striker</label>
+            <select className="input" value={strikerId || ''} onChange={(e) => onSetStriker(e.target.value || null)}>
+              <option value="">Select…</option>
+              {battingTeamPlayers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Non-striker</label>
+            <select className="input" value={nonStrikerId || ''} onChange={(e) => onSetNonStriker(e.target.value || null)}>
+              <option value="">Select…</option>
+              {battingTeamPlayers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Bowler</label>
+            <select className="input" value={bowlerId || ''} onChange={(e) => onSetBowler(e.target.value || null)}>
+              <option value="">Select…</option>
+              {bowlingTeamPlayers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="btn-secondary w-full"
+            onClick={() => {
+              onSetStriker(null);
+              onSetNonStriker(null);
+              onSetBowler(null);
+            }}
+          >
+            Reset to Automatic
+          </button>
+        </div>
       )}
     </div>
   );

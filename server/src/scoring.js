@@ -17,23 +17,69 @@ function ballTotalRuns(b) {
   return b.runsBat + b.extraRuns;
 }
 
+// Normally an over is exactly 6 legal balls. A ball can be voided out of the
+// innings' over-budget entirely (voidedFromOver) - e.g. a bowler barred
+// mid-over for an illegal/dangerous action voids that whole over - so this
+// walk has to skip those balls completely rather than just dividing legal
+// balls by 6. Voided balls still count everywhere else (team total, batter's
+// runs/balls faced, the bowler's own personal figures) - only the innings-
+// wide "how many overs used" tally ignores them, which is what lets a new
+// bowler restart the very same over number from ball 1.
+export function overProgress(balls) {
+  let completedOvers = 0;
+  let legalInCurrentOver = 0;
+  for (const b of balls) {
+    if (b.voidedFromOver) continue;
+    if (b.isLegal) legalInCurrentOver += 1;
+    if (b.isLegal && legalInCurrentOver === 6) {
+      completedOvers += 1;
+      legalInCurrentOver = 0;
+    }
+  }
+  return { completedOvers, legalInCurrentOver };
+}
+
+export function oversStrFromProgress({ completedOvers, legalInCurrentOver }) {
+  return `${completedOvers}.${legalInCurrentOver}`;
+}
+
+// Where the next ball to be recorded lands: which over, and which position
+// within it (1-indexed, same convention an illegal ball shares with the
+// legal ball that would come after it).
+export function nextBallPosition(existingBalls) {
+  const { completedOvers, legalInCurrentOver } = overProgress(existingBalls);
+  return { overNumber: completedOvers, ballInOver: legalInCurrentOver + 1 };
+}
+
+// Dismissal types that aren't credited to the bowler as a wicket - either
+// because no delivery dismissed them (retirements) or because the bowler
+// didn't do the dismissing (run out).
+const NOT_BOWLERS_WICKET = ['RUNOUT', 'RETIRED_OUT', 'RETIRED_HURT'];
+
+// "Retired hurt" (Law 25.4) is voluntary and temporary - the batter can
+// resume their innings later, so it must never count toward the total
+// wickets down or permanently mark them out. "Retired out" (Law 25.5) is
+// the opposite: permanent, and does count, just like any real dismissal.
+const NOT_A_FALLEN_WICKET = ['RETIRED_HURT'];
+
 export function inningsSummary(innings, balls, players, oversLimit) {
   const totalRuns = balls.reduce((s, b) => s + ballTotalRuns(b), 0);
-  const totalWickets = balls.filter((b) => b.isWicket).length;
+  const totalWickets = balls.filter((b) => b.isWicket && !NOT_A_FALLEN_WICKET.includes(b.wicketType)).length;
   const legalBalls = balls.filter((b) => b.isLegal).length;
+  const progress = overProgress(balls);
   // Squads can carry more than 11 registered players (substitutes on the
   // bench), but an innings is only ever played by 11 - cap here so a 13-man
   // squad doesn't wrongly let the innings run to 12 wickets down.
   const battingTeamPlayerCount = Math.min(players.filter((p) => p.teamId === innings.battingTeamId).length, 11);
   const allOut = battingTeamPlayerCount > 0 && totalWickets >= battingTeamPlayerCount - 1;
-  const oversDone = legalBalls >= oversLimit * 6;
+  const oversDone = progress.completedOvers >= oversLimit;
   const target = innings.target;
   const targetReached = target != null && totalRuns >= target;
   return {
     totalRuns,
     totalWickets,
     legalBalls,
-    oversStr: oversDisplay(legalBalls),
+    oversStr: oversStrFromProgress(progress),
     oversLimit,
     runRate: runRate(totalRuns, legalBalls),
     allOut,
@@ -63,6 +109,9 @@ export function battingCard(balls, teamPlayers, allPlayers = teamPlayers) {
   balls.forEach((b, idx) => {
     const striker = map.get(b.strikerId);
     if (!striker) return;
+    // Facing a ball proves a "retired hurt" batter has resumed their
+    // innings - clear the stale note so they don't show retired forever.
+    if (striker.dismissal === 'retired hurt' && !striker.isOut) striker.dismissal = null;
     striker.didBat = true;
     if (striker.battedAt === null) striker.battedAt = idx;
     if (b.extraType === 'NONE' || b.extraType === 'NOBALL') {
@@ -76,7 +125,9 @@ export function battingCard(balls, teamPlayers, allPlayers = teamPlayers) {
     if (b.isWicket && b.dismissedId) {
       const dismissed = map.get(b.dismissedId);
       if (dismissed) {
-        dismissed.isOut = true;
+        // Retired hurt isn't a real dismissal - they keep their spot free to
+        // come back and bat again later, so isOut must stay false for them.
+        if (!NOT_A_FALLEN_WICKET.includes(b.wicketType)) dismissed.isOut = true;
         dismissed.dismissal = describeDismissal(b, allMap);
       }
     }
@@ -109,8 +160,10 @@ function describeDismissal(ball, playerMap) {
       return `run out${fielder ? ` (${fielder})` : ''}`;
     case 'HITWICKET':
       return `hit wicket b. ${bowlerName(ball, playerMap)}`;
-    case 'RETIRED':
-      return 'retired';
+    case 'RETIRED_OUT':
+      return 'retired out';
+    case 'RETIRED_HURT':
+      return 'retired hurt';
     default:
       return 'out';
   }
@@ -129,7 +182,7 @@ export function bowlingCard(balls, teamPlayers) {
       legalBalls: 0,
       runsConceded: 0,
       wickets: 0,
-      overRuns: {},
+      overStats: {},
       didBowl: false,
     });
   }
@@ -143,13 +196,18 @@ export function bowlingCard(balls, teamPlayers) {
     } else {
       bowler.runsConceded += ballTotalRuns(b) - (b.extraType === 'BYE' ? b.extraRuns : 0);
     }
-    if (b.isWicket && b.wicketType !== 'RUNOUT') bowler.wickets += 1;
-    bowler.overRuns[b.overNumber] = (bowler.overRuns[b.overNumber] || 0) + ballTotalRuns(b);
+    if (b.isWicket && !NOT_BOWLERS_WICKET.includes(b.wicketType)) bowler.wickets += 1;
+    if (!bowler.overStats[b.overNumber]) bowler.overStats[b.overNumber] = { runs: 0, legalBalls: 0 };
+    bowler.overStats[b.overNumber].runs += ballTotalRuns(b);
+    if (b.isLegal) bowler.overStats[b.overNumber].legalBalls += 1;
   });
   return [...map.values()]
     .filter((p) => p.didBowl)
     .map((p) => {
-      const maidens = Object.values(p.overRuns).filter((r) => r === 0).length;
+      // A maiden requires a full, uninterrupted 6-ball over - a curtailed
+      // over (bowler barred mid-over) can never be one, however many (zero)
+      // runs came off it.
+      const maidens = Object.values(p.overStats).filter((o) => o.legalBalls === 6 && o.runs === 0).length;
       return {
         playerId: p.playerId,
         name: p.name,
@@ -170,9 +228,13 @@ export function overByOver(balls, players) {
       overs.set(b.overNumber, { overNumber: b.overNumber, bowlerId: b.bowlerId, balls: [], runs: 0, wickets: 0 });
     }
     const o = overs.get(b.overNumber);
+    // A voided over and its restart share the same over number, and could
+    // have two different bowlers - the label shows whoever bowled most
+    // recently in this slot (the bowler actually still at work).
+    o.bowlerId = b.bowlerId;
     o.runs += ballTotalRuns(b);
-    if (b.isWicket) o.wickets += 1;
-    o.balls.push(ballShorthand(b));
+    if (b.isWicket && !NOT_A_FALLEN_WICKET.includes(b.wicketType)) o.wickets += 1;
+    o.balls.push({ text: ballShorthand(b), voided: b.voidedFromOver });
   }
   return [...overs.values()]
     .sort((a, b) => a.overNumber - b.overNumber)
@@ -180,6 +242,9 @@ export function overByOver(balls, players) {
 }
 
 function ballShorthand(b) {
+  // Retired hurt isn't a genuine dismissal (the batter can come back and bat
+  // again later), so it gets its own "H" marker instead of the wicket "W".
+  if (b.isWicket && b.wicketType === 'RETIRED_HURT') return 'H';
   if (b.isWicket) return 'W';
   if (b.extraType === 'WIDE') return b.extraRuns > 1 ? `Wd+${b.extraRuns - 1}` : 'Wd';
   if (b.extraType === 'NOBALL') return b.runsBat > 0 ? `Nb+${b.runsBat}` : 'Nb';
@@ -195,27 +260,16 @@ export function fallOfWickets(balls, players) {
   const fow = [];
   for (const b of balls) {
     runningTotal += ballTotalRuns(b);
-    if (b.isWicket) {
+    if (b.isWicket && !NOT_A_FALLEN_WICKET.includes(b.wicketType)) {
       fow.push({
         wicketNumber: fow.length + 1,
         score: runningTotal,
         playerName: playerMap.get(b.dismissedId) || '?',
-        overStr: oversDisplay(balls.filter((x) => x.isLegal && x.sequence <= b.sequence).length),
+        overStr: oversStrFromProgress(overProgress(balls.filter((x) => x.sequence <= b.sequence))),
       });
     }
   }
   return fow;
-}
-
-// Determines the next over number / ball-in-over and whether strike should
-// rotate, given the balls already recorded in this innings.
-export function nextBallContext(existingBalls) {
-  const legal = existingBalls.filter((b) => b.isLegal);
-  const legalCount = legal.length;
-  const overNumber = Math.floor(legalCount / 6);
-  const ballInOver = (legalCount % 6) + 1;
-  const isNewOver = legalCount % 6 === 0;
-  return { overNumber, ballInOver, isNewOver, legalCount };
 }
 
 export function shouldRotateStrike(type, runsBat, extraRuns) {
@@ -258,7 +312,7 @@ export function computeAwardPoints(balls, players) {
       if (b.runsBat === 6) p.battingPoints += AWARD_POINTS.six;
     }
     if (b.isWicket) {
-      if (b.wicketType !== 'RUNOUT') {
+      if (!NOT_BOWLERS_WICKET.includes(b.wicketType)) {
         ensure(b.bowlerId).bowlingPoints += AWARD_POINTS.wicket;
       }
       if (b.fielderId) {
@@ -269,14 +323,19 @@ export function computeAwardPoints(balls, players) {
     }
   }
 
-  const overRunsByBowler = new Map();
+  const overStatsByBowler = new Map();
   for (const b of balls) {
-    if (!overRunsByBowler.has(b.bowlerId)) overRunsByBowler.set(b.bowlerId, new Map());
-    const overs = overRunsByBowler.get(b.bowlerId);
-    overs.set(b.overNumber, (overs.get(b.overNumber) || 0) + b.runsBat + b.extraRuns);
+    if (!overStatsByBowler.has(b.bowlerId)) overStatsByBowler.set(b.bowlerId, new Map());
+    const overs = overStatsByBowler.get(b.bowlerId);
+    if (!overs.has(b.overNumber)) overs.set(b.overNumber, { runs: 0, legalBalls: 0 });
+    const stat = overs.get(b.overNumber);
+    stat.runs += b.runsBat + b.extraRuns;
+    if (b.isLegal) stat.legalBalls += 1;
   }
-  for (const [bowlerId, overs] of overRunsByBowler) {
-    const maidens = [...overs.values()].filter((r) => r === 0).length;
+  for (const [bowlerId, overs] of overStatsByBowler) {
+    // Same rule as bowlingCard: only a full, uninterrupted 6-ball over can
+    // be a maiden.
+    const maidens = [...overs.values()].filter((o) => o.legalBalls === 6 && o.runs === 0).length;
     if (maidens > 0) ensure(bowlerId).bowlingPoints += maidens * AWARD_POINTS.maidenOver;
   }
 

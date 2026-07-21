@@ -9,7 +9,7 @@
 //   MatchStatus:  SCHEDULED | LIVE | COMPLETED | ABANDONED
 //   TossDecision: BAT | BOWL
 //   ExtraType:    NONE | WIDE | NOBALL | BYE | LEGBYE
-//   WicketType:   BOWLED | CAUGHT | LBW | RUNOUT | STUMPED | HITWICKET | RETIRED
+//   WicketType:   BOWLED | CAUGHT | LBW | RUNOUT | STUMPED | HITWICKET | RETIRED_OUT | RETIRED_HURT
 //   MatchStage:   LEAGUE | FINAL
 //   Gender:       MALE | FEMALE
 
@@ -165,6 +165,14 @@ model Ball {
   dismissed   Player? @relation("Dismissed", fields: [dismissedId], references: [id], onDelete: Cascade)
   fielderId   String?
   fielder     Player? @relation("Fielder", fields: [fielderId], references: [id], onDelete: Cascade)
+
+  // Marks this ball as excluded from the innings' over-budget entirely - the
+  // whole over it belonged to is voided (e.g. a bowler barred mid-over for
+  // an illegal action). Runs/wickets/individual batting and bowling figures
+  // still count exactly as recorded; only the "how many overs has this
+  // innings used" tally skips these balls, so a new bowler restarts the
+  // same over number from ball 1 with the innings' overs budget untouched.
+  voidedFromOver Boolean @default(false)
 
   isFreeHit Boolean  @default(false)
   createdAt DateTime @default(now())

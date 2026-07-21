@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
 
-const WICKET_TYPES = ['BOWLED', 'CAUGHT', 'LBW', 'RUNOUT', 'STUMPED', 'HITWICKET', 'RETIRED'];
+const WICKET_TYPES = ['BOWLED', 'CAUGHT', 'LBW', 'RUNOUT', 'STUMPED', 'HITWICKET', 'RETIRED_OUT', 'RETIRED_HURT'];
+const WICKET_LABELS = {
+  BOWLED: 'BOWLED',
+  CAUGHT: 'CAUGHT',
+  LBW: 'LBW',
+  RUNOUT: 'RUN OUT',
+  STUMPED: 'STUMPED',
+  HITWICKET: 'HIT WICKET',
+  RETIRED_OUT: 'RETIRED OUT',
+  RETIRED_HURT: 'RETIRED HURT',
+};
 const NEEDS_FIELDER = ['CAUGHT', 'STUMPED', 'RUNOUT'];
+// Only these can happen to either batter - everything else (bowled, caught,
+// lbw, stumped, hit wicket) can only ever be the striker facing the ball.
+const NEEDS_WHO_SELECTOR = ['RUNOUT', 'RETIRED_OUT', 'RETIRED_HURT'];
 
 export default function WicketModal({ strikerId, strikerName, nonStrikerId, nonStrikerName, fieldingPlayers, onSubmit, onClose }) {
   const [wicketType, setWicketType] = useState('BOWLED');
@@ -11,6 +24,15 @@ export default function WicketModal({ strikerId, strikerName, nonStrikerId, nonS
 
   const needsFielder = NEEDS_FIELDER.includes(wicketType);
   const isRunOut = wicketType === 'RUNOUT';
+  const needsWhoSelector = NEEDS_WHO_SELECTOR.includes(wicketType);
+
+  const selectType = (t) => {
+    setWicketType(t);
+    // Bowled/caught/lbw/stumped/hit-wicket can only be the striker - reset
+    // so a stale non-striker pick from a previous run-out/retirement doesn't
+    // linger and get submitted as the wrong dismissed player.
+    if (!NEEDS_WHO_SELECTOR.includes(t)) setDismissedId(strikerId);
+  };
 
   const submit = () => {
     onSubmit({
@@ -31,17 +53,17 @@ export default function WicketModal({ strikerId, strikerName, nonStrikerId, nonS
           {WICKET_TYPES.map((t) => (
             <button
               key={t}
-              onClick={() => setWicketType(t)}
+              onClick={() => selectType(t)}
               className={`rounded-lg px-3 py-2 text-xs font-semibold ${
                 wicketType === t ? 'bg-live text-white' : 'bg-surface2 text-slate-600'
               }`}
             >
-              {t}
+              {WICKET_LABELS[t]}
             </button>
           ))}
         </div>
 
-        {isRunOut && (
+        {needsWhoSelector && (
           <>
             <label className="label">Who's out</label>
             <div className="mb-4 grid grid-cols-2 gap-2">
@@ -62,7 +84,11 @@ export default function WicketModal({ strikerId, strikerName, nonStrikerId, nonS
                 {nonStrikerName}
               </button>
             </div>
+          </>
+        )}
 
+        {isRunOut && (
+          <>
             <label className="label">Runs completed before run out</label>
             <div className="mb-4 flex gap-2">
               {[0, 1, 2, 3].map((r) => (

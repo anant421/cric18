@@ -4,7 +4,7 @@ import { requireAdmin } from '../auth.js';
 import { getMatchState, invalidateMatchState } from '../matchState.js';
 import { emitMatchUpdate } from '../sockets.js';
 import { asyncHandler } from '../asyncHandler.js';
-import { computeAwardPoints } from '../scoring.js';
+import { computeAwardPoints, nextBallPosition } from '../scoring.js';
 import { invalidateTournamentDetail } from './tournaments.routes.js';
 
 const router = Router();
@@ -159,12 +159,21 @@ router.post('/:id/ball', requireAdmin, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'inningsId, strikerId, nonStrikerId, bowlerId and type are required' });
   }
 
-  const existingCount = await prisma.ball.count({ where: { inningsId } });
+  const existingBalls = await prisma.ball.findMany({
+    where: { inningsId },
+    orderBy: { sequence: 'asc' },
+    select: { isLegal: true, voidedFromOver: true },
+  });
+  const existingCount = existingBalls.length;
   if (existingCount !== expectedSequence) {
     return res.status(409).json({ error: 'Match state has changed - please refresh before scoring the next ball' });
   }
 
-  const isLegal = type !== 'WIDE' && type !== 'NOBALL';
+  // A retirement isn't a delivery at all - the batter simply leaves the
+  // crease between balls, so it must never consume a legal ball or advance
+  // the over, no matter what `type` the client sent alongside it.
+  const isRetirement = isWicket && ['RETIRED_OUT', 'RETIRED_HURT'].includes(wicketType);
+  const isLegal = !isRetirement && type !== 'WIDE' && type !== 'NOBALL';
   let runsBat = 0;
   let extraRuns = 0;
   let extraType = 'NONE';
@@ -186,10 +195,9 @@ router.post('/:id/ball', requireAdmin, asyncHandler(async (req, res) => {
   } else {
     return res.status(400).json({ error: 'Invalid ball type' });
   }
+  if (isRetirement) runsBat = 0;
 
-  const legalCountBefore = await prisma.ball.count({ where: { inningsId, isLegal: true } });
-  const overNumber = Math.floor(legalCountBefore / 6);
-  const ballInOver = (legalCountBefore % 6) + 1;
+  const { overNumber, ballInOver } = nextBallPosition(existingBalls);
 
   await prisma.ball.create({
     data: {
@@ -212,6 +220,24 @@ router.post('/:id/ball', requireAdmin, asyncHandler(async (req, res) => {
     },
   });
 
+  invalidateMatchState(req.params.id);
+  await maybeFinishInningsOrMatch(req.params.id, inningsId);
+  await sendState(res, req.params.id);
+}));
+
+// --- Void the current over entirely, e.g. a bowler barred mid-over for an
+// illegal/dangerous action. Every ball already bowled this over keeps its
+// runs/wickets for the team total, the batter, and that bowler's own
+// figures - but none of them count toward the innings' overs-used budget.
+// A new bowler is required, and the very next ball restarts this same over
+// number from ball 1, with the innings' overs limit untouched. ---
+router.post('/:id/end-over', requireAdmin, asyncHandler(async (req, res) => {
+  const { inningsId } = req.body || {};
+  if (!inningsId) return res.status(400).json({ error: 'inningsId is required' });
+  const last = await prisma.ball.findFirst({ where: { inningsId }, orderBy: { sequence: 'desc' } });
+  if (!last) return res.status(400).json({ error: 'No balls bowled yet this over' });
+  if (last.voidedFromOver) return res.status(400).json({ error: 'This over has already been ended' });
+  await prisma.ball.updateMany({ where: { inningsId, overNumber: last.overNumber }, data: { voidedFromOver: true } });
   invalidateMatchState(req.params.id);
   await maybeFinishInningsOrMatch(req.params.id, inningsId);
   await sendState(res, req.params.id);

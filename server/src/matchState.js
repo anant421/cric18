@@ -7,6 +7,7 @@ import {
   fallOfWickets,
   shouldRotateStrike,
   runRate,
+  overProgress,
 } from './scoring.js';
 
 function ballKind(ball) {
@@ -26,10 +27,11 @@ export function invalidateMatchState(matchId) {
   cache.delete(matchId);
 }
 
-// Given the most recent ball (or null) plus the innings' chosen openers,
+// Given every ball bowled so far (or none) plus the innings' chosen openers,
 // work out who's on strike / bowling right now and what the admin still
 // needs to supply before the next ball can be recorded.
-function deriveLiveState(innings, lastBall) {
+function deriveLiveState(innings, balls) {
+  const lastBall = balls[balls.length - 1] || null;
   if (!lastBall) {
     return {
       strikerId: innings.openingStrikerId || null,
@@ -55,9 +57,19 @@ function deriveLiveState(innings, lastBall) {
     outSlot = lastBall.dismissedId === striker ? 'striker' : 'nonStriker';
   }
 
+  // Whether the over just ended has to be judged relative to the CURRENT
+  // over, not the innings-wide legal-ball total - once an over can have
+  // voided balls, the running total is no longer a clean multiple of 6 at
+  // every real over boundary, so walk the ball list both with and without
+  // the last ball and see whether it's what tipped the over over. A voided
+  // over (bowler barred mid-over) doesn't advance that count at all, but
+  // still ends the over on the field - the batters still change ends and a
+  // new bowler is still required, exactly as at any other over's end.
   let needsNewBowler = false;
   let previousBowlerId = null;
-  if (lastBall.isLegal && lastBall._legalCountAfter % 6 === 0) {
+  const progressBefore = overProgress(balls.slice(0, -1));
+  const progressAfter = overProgress(balls);
+  if (progressAfter.completedOvers > progressBefore.completedOvers || lastBall.voidedFromOver) {
     [striker, nonStriker] = [nonStriker, striker];
     needsNewBowler = true;
     previousBowlerId = bowler;
@@ -145,25 +157,21 @@ async function computeMatchState(matchId) {
   const inningsData = [];
   for (const inn of match.innings) {
     const balls = ballsByInnings.get(inn.id) || [];
-    const legalBallsSoFar = [];
-    let legalCount = 0;
-    for (const b of balls) {
-      if (b.isLegal) legalCount += 1;
-      b._legalCountAfter = legalCount;
-      legalBallsSoFar.push(b);
-    }
     const battingTeamPlayers = allPlayers.filter((p) => p.teamId === inn.battingTeamId);
     const bowlingTeamPlayers = allPlayers.filter((p) => p.teamId === inn.bowlingTeamId);
     const summary = inningsSummary(inn, balls, allPlayers, match.oversLimit);
-    const lastBall = balls[balls.length - 1] || null;
-    const live = deriveLiveState(inn, lastBall);
+    const live = deriveLiveState(inn, balls);
 
     let requiredRunRate = null;
     let runsNeeded = null;
     let ballsRemaining = null;
     if (inn.target != null && !summary.isDone) {
       runsNeeded = Math.max(inn.target - summary.totalRuns, 0);
-      ballsRemaining = match.oversLimit * 6 - summary.legalBalls;
+      // Can't just be oversLimit*6 - legalBalls: an over sealed early (bowler
+      // barred mid-over) delivers fewer than 6 legal balls but still uses up
+      // one of the innings' allotted overs.
+      const progress = overProgress(balls);
+      ballsRemaining = (match.oversLimit - progress.completedOvers) * 6 - progress.legalInCurrentOver;
       requiredRunRate = ballsRemaining > 0 ? runRate(runsNeeded, ballsRemaining) : null;
     }
 

@@ -172,7 +172,9 @@ async function computePointsTable(tournamentId) {
       const inningsBalls = ballsByInnings.get(inn.id) || [];
       const totalRuns = inningsBalls.reduce((s, x) => s + x.runsBat + x.extraRuns, 0);
       const legalBalls = inningsBalls.filter((x) => x.isLegal).length;
-      const wickets = inningsBalls.filter((x) => x.isWicket).length;
+      // Retired hurt is temporary (the batter can resume later) and never
+      // counts as a fallen wicket, unlike a permanent "retired out".
+      const wickets = inningsBalls.filter((x) => x.isWicket && x.wicketType !== 'RETIRED_HURT').length;
       // Cap at 11 - squads can carry substitutes beyond the playing XI.
       const battingSquadSize = Math.min(playerCount.get(inn.battingTeamId) || 0, 11);
       const allOut = battingSquadSize > 0 && wickets >= battingSquadSize - 1;
@@ -250,7 +252,9 @@ router.get('/:id/stats/leaderboards', asyncHandler(async (req, res) => {
       }
       if (b.isLegal || b.extraType === 'NOBALL') bat.balls += 1;
     }
-    if (b.isWicket && b.dismissedId && batting.has(b.dismissedId)) {
+    // Retired hurt isn't a genuine dismissal (the batter can resume later),
+    // so it shouldn't count as an "out" for batting average purposes.
+    if (b.isWicket && b.wicketType !== 'RETIRED_HURT' && b.dismissedId && batting.has(b.dismissedId)) {
       batting.get(b.dismissedId).outs += 1;
     }
     const bowl = bowling.get(b.bowlerId);
@@ -262,7 +266,7 @@ router.get('/:id/stats/leaderboards', asyncHandler(async (req, res) => {
       }
       if (b.isLegal) bowl.legalBalls += 1;
       if (b.extraType !== 'BYE') bowl.runsConceded += b.runsBat + b.extraRuns;
-      if (b.isWicket && b.wicketType !== 'RUNOUT') bowl.wickets += 1;
+      if (b.isWicket && !['RUNOUT', 'RETIRED_OUT', 'RETIRED_HURT'].includes(b.wicketType)) bowl.wickets += 1;
     }
   }
 
@@ -325,7 +329,7 @@ router.get('/:id/awards', asyncHandler(async (req, res) => {
   for (const b of balls) {
     if (!bowlerStats.has(b.bowlerId)) bowlerStats.set(b.bowlerId, { wickets: 0, runsConceded: 0 });
     const s = bowlerStats.get(b.bowlerId);
-    if (b.isWicket && b.wicketType !== 'RUNOUT') s.wickets += 1;
+    if (b.isWicket && !['RUNOUT', 'RETIRED_OUT', 'RETIRED_HURT'].includes(b.wicketType)) s.wickets += 1;
     if (b.extraType !== 'BYE') s.runsConceded += b.runsBat + b.extraRuns;
   }
   const [bestBowlerId, bestBowlerStats] =
