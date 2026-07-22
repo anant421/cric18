@@ -34,6 +34,9 @@ export default function AdminScoring() {
   const [manualStrikerId, setManualStrikerId] = useState(null);
   const [manualNonStrikerId, setManualNonStrikerId] = useState(null);
   const [manualBowlerId, setManualBowlerId] = useState(null);
+  // Shown once per over-ending event; the bowler picker only appears after
+  // this is approved.
+  const [endOfOverApproved, setEndOfOverApproved] = useState(false);
 
   const refresh = () => api.get(`/matches/${id}`).then(setMatch).catch((e) => setError(e.message));
 
@@ -56,6 +59,7 @@ export default function AdminScoring() {
     setManualStrikerId(null);
     setManualNonStrikerId(null);
     setManualBowlerId(null);
+    setEndOfOverApproved(false);
   }, [match?.currentInningsNumber, match?.innings?.[match.currentInningsNumber - 1]?.expectedSequence]);
 
   if (error) return <p className="mx-auto max-w-3xl px-4 py-8 text-red-600">{error}</p>;
@@ -103,6 +107,8 @@ export default function AdminScoring() {
           setManualStrikerId={setManualStrikerId}
           setManualNonStrikerId={setManualNonStrikerId}
           setManualBowlerId={setManualBowlerId}
+          endOfOverApproved={endOfOverApproved}
+          setEndOfOverApproved={setEndOfOverApproved}
           showWicket={showWicket}
           setShowWicket={setShowWicket}
           onError={setError}
@@ -203,6 +209,8 @@ function ScoringConsole({
   setManualStrikerId,
   setManualNonStrikerId,
   setManualBowlerId,
+  endOfOverApproved,
+  setEndOfOverApproved,
   showWicket,
   setShowWicket,
   onError,
@@ -272,11 +280,12 @@ function ScoringConsole({
     }
   };
 
-  // Only meaningful mid-over, once at least one ball has actually been
-  // bowled in it - and only while scoring is otherwise active (not while
-  // already waiting on a new batsman/bowler pick).
-  const currentOver = innings.overByOver[innings.overByOver.length - 1];
-  const canEndOverEarly = canScore && currentOver && currentOver.balls.length > 0;
+  const lastOver = innings.overByOver[innings.overByOver.length - 1];
+  // Only meaningful once the CURRENT bowler has actually bowled at least one
+  // ball in this attempt - right after picking a new bowler, lastOver still
+  // points at the previous (already finished) over until they've bowled
+  // something, and this must never let that stale over get voided instead.
+  const canEndOverEarly = canScore && lastOver && lastOver.balls.length > 0 && lastOver.bowlerId === effectiveBowlerId;
 
   const endOverEarly = async () => {
     if (!confirm("End this over now? The balls already bowled keep their runs/wickets, but a new bowler will be needed and the next ball starts a fresh over.")) return;
@@ -288,10 +297,22 @@ function ScoringConsole({
   };
 
   const strikerName = (id) => battingTeamPlayers.find((p) => p.id === id)?.name || '?';
+  // Bowler can come from either roster depending on which team is bowling,
+  // and this is also used for the striker/non-striker header labels so a
+  // pending pick shows up immediately instead of waiting for the first ball.
+  const playerName = (id) => [...battingTeamPlayers, ...bowlingTeamPlayers].find((p) => p.id === id)?.name || null;
+
+  const showEndOfOverSummary = !needsBatsmanPick && needsBowlerPick && !endOfOverApproved && lastOver;
 
   return (
     <div className="space-y-5">
-      <ScoreHeader match={match} innings={innings} />
+      <ScoreHeader
+        match={match}
+        innings={innings}
+        strikerName={playerName(effectiveStrikerId)}
+        nonStrikerName={playerName(effectiveNonStrikerId)}
+        bowlerName={playerName(effectiveBowlerId)}
+      />
 
       <ManualCorrectionPanel
         battingTeamPlayers={battingTeamPlayers}
@@ -368,7 +389,11 @@ function ScoringConsole({
         />
       )}
 
-      {!needsBatsmanPick && needsBowlerPick && (
+      {showEndOfOverSummary && (
+        <EndOfOverModal summary={innings.summary} lastOver={lastOver} onApprove={() => setEndOfOverApproved(true)} />
+      )}
+
+      {!needsBatsmanPick && needsBowlerPick && endOfOverApproved && (
         <SelectPlayerModal
           title="Select bowler for next over"
           players={bowlingTeamPlayers}
@@ -376,6 +401,30 @@ function ScoringConsole({
           onSelect={setPendingBowlerId}
         />
       )}
+    </div>
+  );
+}
+
+// Shown right when an over ends (normal completion or a barred bowler's over
+// being voided), before the bowler-for-next-over picker appears - a quick
+// checkpoint so the scorer can confirm the total/last over before moving on.
+function EndOfOverModal({ summary, lastOver, onApprove }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
+      <div className="w-full max-w-sm rounded-t-2xl bg-surface p-6 text-center sm:rounded-2xl">
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Over {lastOver.overNumber + 1} complete</p>
+        <p className="mt-2 text-4xl font-extrabold tabular-nums">
+          {summary.totalRuns}
+          <span className="text-2xl text-slate-500">/{summary.totalWickets}</span>
+        </p>
+        <p className="mt-1 text-sm text-slate-500">
+          {lastOver.runs} run{lastOver.runs === 1 ? '' : 's'} in that over
+          {lastOver.wickets > 0 ? ` · ${lastOver.wickets} wicket${lastOver.wickets === 1 ? '' : 's'}` : ''}
+        </p>
+        <button className="btn-primary mt-5 w-full" onClick={onApprove}>
+          Continue to Next Over
+        </button>
+      </div>
     </div>
   );
 }
@@ -396,6 +445,27 @@ function ManualCorrectionPanel({
   onSetBowler,
 }) {
   const [open, setOpen] = useState(false);
+  const [draftStrikerId, setDraftStrikerId] = useState(strikerId || '');
+  const [draftNonStrikerId, setDraftNonStrikerId] = useState(nonStrikerId || '');
+  const [draftBowlerId, setDraftBowlerId] = useState(bowlerId || '');
+
+  // Keep the draft in sync with whatever's actually in effect right now
+  // (e.g. after a ball is scored) so reopening the panel never shows a
+  // stale earlier draft instead of the current real state.
+  useEffect(() => {
+    setDraftStrikerId(strikerId || '');
+    setDraftNonStrikerId(nonStrikerId || '');
+    setDraftBowlerId(bowlerId || '');
+  }, [strikerId, nonStrikerId, bowlerId]);
+
+  const hasChanges =
+    draftStrikerId !== (strikerId || '') || draftNonStrikerId !== (nonStrikerId || '') || draftBowlerId !== (bowlerId || '');
+
+  const apply = () => {
+    onSetStriker(draftStrikerId || null);
+    onSetNonStriker(draftNonStrikerId || null);
+    onSetBowler(draftBowlerId || null);
+  };
 
   return (
     <div className="card p-4">
@@ -406,11 +476,11 @@ function ManualCorrectionPanel({
       {open && (
         <div className="mt-3 space-y-3">
           <p className="text-xs text-slate-500">
-            Only use this if something's wrong - it directly overrides who's on strike, non-strike, or bowling for the next ball you score.
+            Only use this if something's wrong - pick the correct players, then tap Update to apply it immediately.
           </p>
           <div>
             <label className="label">Striker</label>
-            <select className="input" value={strikerId || ''} onChange={(e) => onSetStriker(e.target.value || null)}>
+            <select className="input" value={draftStrikerId} onChange={(e) => setDraftStrikerId(e.target.value)}>
               <option value="">Select…</option>
               {battingTeamPlayers.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -421,7 +491,7 @@ function ManualCorrectionPanel({
           </div>
           <div>
             <label className="label">Non-striker</label>
-            <select className="input" value={nonStrikerId || ''} onChange={(e) => onSetNonStriker(e.target.value || null)}>
+            <select className="input" value={draftNonStrikerId} onChange={(e) => setDraftNonStrikerId(e.target.value)}>
               <option value="">Select…</option>
               {battingTeamPlayers.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -432,7 +502,7 @@ function ManualCorrectionPanel({
           </div>
           <div>
             <label className="label">Bowler</label>
-            <select className="input" value={bowlerId || ''} onChange={(e) => onSetBowler(e.target.value || null)}>
+            <select className="input" value={draftBowlerId} onChange={(e) => setDraftBowlerId(e.target.value)}>
               <option value="">Select…</option>
               {bowlingTeamPlayers.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -441,16 +511,21 @@ function ManualCorrectionPanel({
               ))}
             </select>
           </div>
-          <button
-            className="btn-secondary w-full"
-            onClick={() => {
-              onSetStriker(null);
-              onSetNonStriker(null);
-              onSetBowler(null);
-            }}
-          >
-            Reset to Automatic
-          </button>
+          <div className="flex gap-2">
+            <button
+              className="btn-secondary flex-1"
+              onClick={() => {
+                onSetStriker(null);
+                onSetNonStriker(null);
+                onSetBowler(null);
+              }}
+            >
+              Reset to Automatic
+            </button>
+            <button className="btn-primary flex-1" disabled={!hasChanges} onClick={apply}>
+              Update
+            </button>
+          </div>
         </div>
       )}
     </div>

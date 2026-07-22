@@ -184,12 +184,14 @@ export function bowlingCard(balls, teamPlayers) {
       wickets: 0,
       overStats: {},
       didBowl: false,
+      wasBarred: false,
     });
   }
   balls.forEach((b) => {
     const bowler = map.get(b.bowlerId);
     if (!bowler) return;
     bowler.didBowl = true;
+    if (b.voidedFromOver) bowler.wasBarred = true;
     if (b.isLegal) bowler.legalBalls += 1;
     if (b.extraType === 'BYE') {
       // byes don't count against the bowler
@@ -216,6 +218,7 @@ export function bowlingCard(balls, teamPlayers) {
         runsConceded: p.runsConceded,
         wickets: p.wickets,
         economy: runRate(p.runsConceded, p.legalBalls),
+        wasBarred: p.wasBarred,
       };
     });
 }

@@ -18,7 +18,7 @@ export default function BowlingTable({ rows, bowlerId }) {
         <tbody>
           {rows.map((p) => (
             <tr key={p.playerId} className="border-b border-border/50 last:border-0">
-              <td className="px-4 py-2.5 font-medium">
+              <td className={`px-4 py-2.5 font-medium ${p.wasBarred ? 'text-live' : ''}`} title={p.wasBarred ? 'Barred mid-over' : undefined}>
                 {p.name}
                 {p.playerId === bowlerId && <span className="ml-1 text-gold">*</span>}
               </td>

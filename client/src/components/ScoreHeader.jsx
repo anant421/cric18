@@ -7,7 +7,7 @@ function teamName(match, teamId) {
   return null;
 }
 
-export default function ScoreHeader({ match, innings }) {
+export default function ScoreHeader({ match, innings, strikerName, nonStrikerName, bowlerName }) {
   if (!innings) {
     return (
       <div className="card p-6 text-center text-slate-500">
@@ -59,15 +59,15 @@ export default function ScoreHeader({ match, innings }) {
       <div className="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4 text-sm">
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-400">Striker</p>
-          <p className="font-semibold">{innings.live.strikerName || '—'}</p>
+          <p className="font-semibold">{strikerName || innings.live.strikerName || '—'}</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-400">Non-striker</p>
-          <p className="font-semibold">{innings.live.nonStrikerName || '—'}</p>
+          <p className="font-semibold">{nonStrikerName || innings.live.nonStrikerName || '—'}</p>
         </div>
         <div className="col-span-2">
           <p className="text-xs uppercase tracking-wide text-slate-400">Bowler</p>
-          <p className="font-semibold">{innings.live.bowlerName || '—'}</p>
+          <p className="font-semibold">{bowlerName || innings.live.bowlerName || '—'}</p>
         </div>
       </div>
     </div>
