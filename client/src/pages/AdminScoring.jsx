@@ -304,6 +304,29 @@ function ScoringConsole({
 
   const showEndOfOverSummary = !needsBatsmanPick && needsBowlerPick && !endOfOverApproved && lastOver;
 
+  // A freshly-picked batter/bowler shouldn't wait for their first ball to
+  // show up in these tables - mirrors the instant-name fix already applied
+  // to the ScoreHeader striker/non-striker/bowler labels.
+  const displayBattingCard = [...innings.battingCard];
+  const battedIds = new Set(displayBattingCard.map((p) => p.playerId));
+  [effectiveStrikerId, effectiveNonStrikerId].forEach((id) => {
+    if (id && !battedIds.has(id)) {
+      displayBattingCard.push({
+        playerId: id, name: playerName(id) || '?', runs: 0, balls: 0,
+        fours: 0, sixes: 0, isOut: false, dismissal: null, strikeRate: 0,
+      });
+      battedIds.add(id);
+    }
+  });
+
+  const displayBowlingCard = [...innings.bowlingCard];
+  if (effectiveBowlerId && !displayBowlingCard.some((p) => p.playerId === effectiveBowlerId)) {
+    displayBowlingCard.push({
+      playerId: effectiveBowlerId, name: playerName(effectiveBowlerId) || '?', oversStr: '0.0',
+      maidens: 0, runsConceded: 0, wickets: 0, economy: 0, wasBarred: false,
+    });
+  }
+
   return (
     <div className="space-y-5">
       <ScoreHeader
@@ -361,11 +384,11 @@ function ScoringConsole({
       </div>
       <div className="card overflow-hidden">
         <h3 className="border-b border-border px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-500">Batting</h3>
-        <BattingTable rows={innings.battingCard} strikerId={effectiveStrikerId} />
+        <BattingTable rows={displayBattingCard} strikerId={effectiveStrikerId} />
       </div>
       <div className="card overflow-hidden">
         <h3 className="border-b border-border px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-500">Bowling</h3>
-        <BowlingTable rows={innings.bowlingCard} bowlerId={effectiveBowlerId} />
+        <BowlingTable rows={displayBowlingCard} bowlerId={effectiveBowlerId} />
       </div>
 
       {showWicket && (
