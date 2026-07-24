@@ -82,6 +82,9 @@ export default function AdminScoring() {
       {match.status === 'COMPLETED' && (
         <div className="card mb-5 p-4 text-center font-semibold text-gold">{match.resultText}</div>
       )}
+      {match.status !== 'COMPLETED' && match.resultText && (
+        <div className="card mb-5 p-4 text-center font-semibold text-gold">{match.resultText}</div>
+      )}
 
       {needsToss && (
         <TossForm
@@ -327,6 +330,20 @@ function ScoringConsole({
     });
   }
 
+  const lastInningsNumber = Math.max(...match.innings.map((i) => i.inningsNumber));
+  const isLastInnings = innings.inningsNumber === lastInningsNumber;
+  // Odd innings number just finished (1, or the first half of a Super Over
+  // pair like 3) - needs its second half.
+  const needsPairSecondHalf = innings.summary.isDone && innings.inningsNumber % 2 === 1 && isLastInnings;
+  // Even innings number just finished level in the Final - a Super Over
+  // decides it (and if that ties too, another one).
+  const tiedFinalNeedsSuperOver =
+    innings.summary.isDone &&
+    innings.inningsNumber % 2 === 0 &&
+    isLastInnings &&
+    match.stage === 'FINAL' &&
+    match.status !== 'COMPLETED';
+
   return (
     <div className="space-y-5">
       <ScoreHeader
@@ -348,7 +365,7 @@ function ScoringConsole({
         onSetBowler={setManualBowlerId}
       />
 
-      {innings.summary.isDone && innings.inningsNumber === 1 && match.innings.length === 1 && (
+      {needsPairSecondHalf && (
         <button
           className="btn-primary w-full"
           onClick={async () => {
@@ -359,7 +376,22 @@ function ScoringConsole({
             }
           }}
         >
-          Start 2nd Innings
+          {innings.isSuperOver ? 'Start Super Over — 2nd Innings' : 'Start 2nd Innings'}
+        </button>
+      )}
+
+      {tiedFinalNeedsSuperOver && (
+        <button
+          className="btn-primary w-full"
+          onClick={async () => {
+            try {
+              await api.post(`/matches/${match.id}/start-super-over`, {}, token);
+            } catch (err) {
+              onError(err.message);
+            }
+          }}
+        >
+          Start Super Over
         </button>
       )}
 

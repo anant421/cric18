@@ -159,7 +159,10 @@ async function computeMatchState(matchId) {
     const balls = ballsByInnings.get(inn.id) || [];
     const battingTeamPlayers = allPlayers.filter((p) => p.teamId === inn.battingTeamId);
     const bowlingTeamPlayers = allPlayers.filter((p) => p.teamId === inn.bowlingTeamId);
-    const summary = inningsSummary(inn, balls, allPlayers, match.oversLimit);
+    // A Super Over is always exactly 1 over, regardless of the match's own
+    // overs limit.
+    const oversLimitForInnings = inn.isSuperOver ? 1 : match.oversLimit;
+    const summary = inningsSummary(inn, balls, allPlayers, oversLimitForInnings);
     const live = deriveLiveState(inn, balls);
 
     let requiredRunRate = null;
@@ -171,13 +174,14 @@ async function computeMatchState(matchId) {
       // barred mid-over) delivers fewer than 6 legal balls but still uses up
       // one of the innings' allotted overs.
       const progress = overProgress(balls);
-      ballsRemaining = (match.oversLimit - progress.completedOvers) * 6 - progress.legalInCurrentOver;
+      ballsRemaining = (oversLimitForInnings - progress.completedOvers) * 6 - progress.legalInCurrentOver;
       requiredRunRate = ballsRemaining > 0 ? runRate(runsNeeded, ballsRemaining) : null;
     }
 
     inningsData.push({
       id: inn.id,
       inningsNumber: inn.inningsNumber,
+      isSuperOver: inn.isSuperOver,
       battingTeamId: inn.battingTeamId,
       bowlingTeamId: inn.bowlingTeamId,
       target: inn.target,

@@ -125,6 +125,10 @@ model Innings {
   bowlingTeamId String
   target        Int?
   isCompleted   Boolean @default(false)
+  // A 1-over eliminator innings played when a Final ties - always comes in
+  // pairs (like a normal innings 1/2) but uses a fixed 1-over limit instead
+  // of the match's oversLimit, and is excluded from NRR calculations.
+  isSuperOver   Boolean @default(false)
 
   openingStrikerId    String?
   openingNonStrikerId String?

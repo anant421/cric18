@@ -109,32 +109,81 @@ router.post('/:id/lineup', requireAdmin, asyncHandler(async (req, res) => {
   await sendState(res, req.params.id);
 }));
 
-// --- Start second innings once the first has finished ---
+// --- Start the second half of the current innings pair once the first has
+// finished - this covers both the normal innings 1 -> 2 handoff and a Super
+// Over's own first -> second innings handoff, since they work identically. ---
 router.post('/:id/start-second-innings', requireAdmin, asyncHandler(async (req, res) => {
   const match = await prisma.match.findUnique({ where: { id: req.params.id }, include: { innings: true } });
   if (!match) return res.status(404).json({ error: 'Match not found' });
-  const first = match.innings.find((i) => i.inningsNumber === 1);
-  if (!first || !first.isCompleted) return res.status(400).json({ error: 'First innings is not complete yet' });
-  if (match.innings.some((i) => i.inningsNumber === 2)) {
+  const maxNumber = Math.max(0, ...match.innings.map((i) => i.inningsNumber));
+  const first = match.innings.find((i) => i.inningsNumber === maxNumber);
+  if (!first || maxNumber % 2 !== 1) return res.status(400).json({ error: 'No innings is awaiting its second half' });
+  if (!first.isCompleted) return res.status(400).json({ error: 'First innings is not complete yet' });
+  if (match.innings.some((i) => i.inningsNumber === maxNumber + 1)) {
     return res.status(400).json({ error: 'Second innings already started' });
   }
   const state = await getMatchState(match.id);
-  const firstRuns = state.innings[0].summary.totalRuns;
+  const firstRuns = state.innings.find((i) => i.inningsNumber === maxNumber).summary.totalRuns;
 
   await prisma.$transaction([
-    prisma.match.update({ where: { id: match.id }, data: { currentInningsNumber: 2 } }),
+    prisma.match.update({ where: { id: match.id }, data: { currentInningsNumber: maxNumber + 1 } }),
     prisma.innings.create({
       data: {
         matchId: match.id,
-        inningsNumber: 2,
+        inningsNumber: maxNumber + 1,
         battingTeamId: first.bowlingTeamId,
         bowlingTeamId: first.battingTeamId,
         target: firstRuns + 1,
+        isSuperOver: first.isSuperOver,
       },
     }),
   ]);
 
   invalidateMatchState(match.id);
+  await sendState(res, match.id);
+}));
+
+// --- Start a Super Over once the Final's previous innings pair has ended
+// level - per the Laws, the team that batted second (chased) in the pair
+// that just tied bats first in the Super Over. ---
+router.post('/:id/start-super-over', requireAdmin, asyncHandler(async (req, res) => {
+  const match = await prisma.match.findUnique({ where: { id: req.params.id }, include: { innings: true } });
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+  if (match.stage !== 'FINAL') return res.status(400).json({ error: 'A Super Over is only available for the Final' });
+
+  const maxNumber = Math.max(0, ...match.innings.map((i) => i.inningsNumber));
+  if (maxNumber < 2 || maxNumber % 2 !== 0) {
+    return res.status(400).json({ error: 'The previous innings pair must be complete first' });
+  }
+  const pairSecond = match.innings.find((i) => i.inningsNumber === maxNumber);
+  const pairFirst = match.innings.find((i) => i.inningsNumber === maxNumber - 1);
+  if (!pairSecond?.isCompleted || !pairFirst?.isCompleted) {
+    return res.status(400).json({ error: 'The previous innings pair is not complete yet' });
+  }
+
+  const state = await getMatchState(match.id);
+  const firstRuns = state.innings.find((i) => i.inningsNumber === maxNumber - 1).summary.totalRuns;
+  const secondRuns = state.innings.find((i) => i.inningsNumber === maxNumber).summary.totalRuns;
+  if (firstRuns !== secondRuns) return res.status(400).json({ error: 'Scores are not level - no Super Over needed' });
+
+  await prisma.$transaction([
+    prisma.match.update({
+      where: { id: match.id },
+      data: { currentInningsNumber: maxNumber + 1, status: 'LIVE', winnerTeamId: null, resultText: null },
+    }),
+    prisma.innings.create({
+      data: {
+        matchId: match.id,
+        inningsNumber: maxNumber + 1,
+        battingTeamId: pairSecond.battingTeamId,
+        bowlingTeamId: pairSecond.bowlingTeamId,
+        isSuperOver: true,
+      },
+    }),
+  ]);
+
+  invalidateMatchState(match.id);
+  invalidateTournamentDetail(match.tournamentId);
   await sendState(res, match.id);
 }));
 
@@ -251,7 +300,13 @@ router.post('/:id/undo', requireAdmin, asyncHandler(async (req, res) => {
   if (!last) return res.status(400).json({ error: 'No balls to undo' });
   await prisma.ball.delete({ where: { id: last.id } });
   await prisma.innings.update({ where: { id: inningsId }, data: { isCompleted: false } });
-  const { count } = await prisma.match.updateMany({ where: { id: req.params.id, status: 'COMPLETED' }, data: { status: 'LIVE', winnerTeamId: null, resultText: null, manOfMatchId: null } });
+  // Reset any result already recorded off the back of this innings - covers
+  // both a fully COMPLETED match and a tied Final left LIVE while awaiting a
+  // Super Over (resultText set, status never flipped to COMPLETED).
+  const { count } = await prisma.match.updateMany({
+    where: { id: req.params.id, OR: [{ status: 'COMPLETED' }, { resultText: { not: null } }] },
+    data: { status: 'LIVE', winnerTeamId: null, resultText: null, manOfMatchId: null },
+  });
   if (count > 0) {
     const match = await prisma.match.findUnique({ where: { id: req.params.id }, select: { tournamentId: true } });
     invalidateTournamentDetail(match.tournamentId);
@@ -268,27 +323,48 @@ async function maybeFinishInningsOrMatch(matchId, inningsId) {
   await prisma.innings.update({ where: { id: inningsId }, data: { isCompleted: true } });
   invalidateMatchState(matchId);
 
-  if (inn.inningsNumber === 2) {
-    const first = state.innings.find((i) => i.inningsNumber === 1);
+  // Only the second innings of a pair (normal 1/2, or a Super Over's own
+  // pair) can decide anything - the first innings of a pair just sets the
+  // target and waits for its second half.
+  if (inn.inningsNumber % 2 === 0) {
+    const first = state.innings.find((i) => i.inningsNumber === inn.inningsNumber - 1);
     const second = inn;
     const match = await prisma.match.findUnique({ where: { id: matchId }, include: { teamA: { include: { players: true } }, teamB: { include: { players: true } } } });
     // Cap at 11 - a squad can carry substitutes beyond the playing XI, but
     // only 11 ever bat, so the win margin should never exceed 10 wickets.
     const secondTeamPlayerCount = Math.min(second.battingTeamId === match.teamAId ? match.teamA.players.length : match.teamB.players.length, 11);
 
+    const suffix = second.isSuperOver ? ' (Super Over)' : '';
     let winnerTeamId = null;
-    let resultText = 'Match tied';
+    let resultText = null;
+    let isTied = false;
     if (second.summary.totalRuns > first.summary.totalRuns) {
       const wicketsInHand = Math.max(secondTeamPlayerCount - 1 - second.summary.totalWickets, 0);
       winnerTeamId = second.battingTeamId;
       const teamName = second.battingTeamId === match.teamAId ? match.teamA.name : match.teamB.name;
-      resultText = `${teamName} won by ${wicketsInHand} wicket${wicketsInHand === 1 ? '' : 's'}`;
+      resultText = `${teamName} won by ${wicketsInHand} wicket${wicketsInHand === 1 ? '' : 's'}${suffix}`;
     } else if (first.summary.totalRuns > second.summary.totalRuns) {
       const margin = first.summary.totalRuns - second.summary.totalRuns;
       winnerTeamId = first.battingTeamId;
       const teamName = first.battingTeamId === match.teamAId ? match.teamA.name : match.teamB.name;
-      resultText = `${teamName} won by ${margin} run${margin === 1 ? '' : 's'}`;
+      resultText = `${teamName} won by ${margin} run${margin === 1 ? '' : 's'}${suffix}`;
+    } else {
+      isTied = true;
     }
+
+    // A tied Final isn't finished - a Super Over is needed (and if that ties
+    // too, another one). Every other tie (league stage, or a non-final) ends
+    // the match as a draw right here.
+    if (isTied && match.stage === 'FINAL') {
+      resultText = second.isSuperOver
+        ? 'Scores level after the Super Over — another Super Over needed'
+        : 'Scores level — Super Over needed';
+      await prisma.match.update({ where: { id: matchId }, data: { winnerTeamId: null, resultText } });
+      invalidateMatchState(matchId);
+      invalidateTournamentDetail(match.tournamentId);
+      return;
+    }
+    if (isTied) resultText = 'Match tied';
 
     const allPlayers = [...match.teamA.players, ...match.teamB.players];
     const allBalls = await prisma.ball.findMany({

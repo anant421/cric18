@@ -73,20 +73,27 @@ export default function MatchLive() {
 
       {match.innings.length > 1 && (
         <div className="mb-4 flex gap-1 border-b border-border">
-          {match.innings.map((inn, i) => (
-            <button
-              key={inn.id}
-              onClick={() => {
-                setView('scorecard');
-                setInningsTab(i);
-              }}
-              className={`px-3 py-2 text-sm font-semibold ${
-                view === 'scorecard' && inningsTab === i ? 'border-b-2 border-brand text-navy' : 'text-slate-500'
-              }`}
-            >
-              Innings {inn.inningsNumber}
-            </button>
-          ))}
+          {match.innings.map((inn, i) => {
+            const superOverInnings = match.innings.filter((x) => x.isSuperOver);
+            const soIndex = superOverInnings.findIndex((x) => x.id === inn.id);
+            const label = inn.isSuperOver
+              ? `Super Over ${Math.floor(soIndex / 2) + 1}${soIndex % 2 === 0 ? ' (1st)' : ' (2nd)'}`
+              : `Innings ${inn.inningsNumber}`;
+            return (
+              <button
+                key={inn.id}
+                onClick={() => {
+                  setView('scorecard');
+                  setInningsTab(i);
+                }}
+                className={`px-3 py-2 text-sm font-semibold ${
+                  view === 'scorecard' && inningsTab === i ? 'border-b-2 border-brand text-navy' : 'text-slate-500'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
           <button
             onClick={() => setView('live')}
             className={`ml-auto px-3 py-2 text-sm font-semibold ${view === 'live' ? 'border-b-2 border-brand text-navy' : 'text-slate-500'}`}
@@ -124,10 +131,10 @@ export default function MatchLive() {
         <ScorecardView innings={scorecardInnings} />
       )}
 
-      {match.innings.length > 0 && (
+      {match.innings.some((inn) => !inn.isSuperOver) && (
         <div className="mt-5">
           <ManhattanChart
-            innings={match.innings}
+            innings={match.innings.filter((inn) => !inn.isSuperOver)}
             teamName={(teamId) => (teamId === match.teamA.id ? match.teamA.shortName : match.teamB.shortName)}
           />
         </div>

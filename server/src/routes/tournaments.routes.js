@@ -168,7 +168,9 @@ async function computePointsTable(tournamentId) {
       a.lost += 1;
     }
 
-    for (const inn of m.innings) {
+    // A Super Over never counts toward Net Run Rate, same as in real
+    // cricket - it's a 1-over eliminator, not part of the normal innings.
+    for (const inn of m.innings.filter((i) => !i.isSuperOver)) {
       const inningsBalls = ballsByInnings.get(inn.id) || [];
       const totalRuns = inningsBalls.reduce((s, x) => s + x.runsBat + x.extraRuns, 0);
       const legalBalls = inningsBalls.filter((x) => x.isLegal).length;
@@ -225,8 +227,10 @@ router.get('/:id/points-table', asyncHandler(async (req, res) => {
 router.get('/:id/stats/leaderboards', asyncHandler(async (req, res) => {
   const tournamentId = req.params.id;
   const players = await prisma.player.findMany({ where: { tournamentId }, include: { team: true } });
+  // Super Over deliveries are excluded, same as from NRR - a tiebreaker
+  // shouldn't inflate a player's season batting/bowling numbers.
   const balls = await prisma.ball.findMany({
-    where: { innings: { match: { tournamentId } } },
+    where: { innings: { match: { tournamentId }, isSuperOver: false } },
   });
 
   const batting = new Map();
@@ -297,8 +301,10 @@ router.get('/:id/awards', asyncHandler(async (req, res) => {
     include: { teamA: true, teamB: true, manOfMatch: true },
     orderBy: { scheduledAt: 'asc' },
   });
+  // Super Over deliveries don't count toward season-wide awards, same as
+  // the leaderboards and NRR - it's a tiebreaker, not part of the season.
   const balls = await prisma.ball.findMany({
-    where: { innings: { match: { tournamentId, status: 'COMPLETED' } } },
+    where: { innings: { match: { tournamentId, status: 'COMPLETED' }, isSuperOver: false } },
   });
 
   // These tournament-wide awards are only crowned once the tournament has
